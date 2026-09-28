@@ -36,8 +36,12 @@ Full observability (Prometheus + Grafana), a Claude copilot, and a React console
   impl and Grafana shows the p50/p99 split.
 - **A strategy that runs** — cash-and-carry basis backtest with honest P&L
   attribution (funding vs fees vs financing): Sharpe 0.98, Calmar 1.29, max DD −3.5%.
-- **Tested** — property-based suite (pytest + Hypothesis) + zero-dependency C++
-  tests in CI, covering parity, VaR ≤ ES, routing optimality, IL symmetry, and determinism.
+- **Tested** — **229 tests in CI**: 126 zero-dependency C++ tests (order book, feed
+  quality gate, FIX wire + session, pre-trade risk, matching engine, end-to-end FIX
+  venue) and 103 Python tests including a property-based suite (pytest + Hypothesis)
+  and a C++/Python parity suite that runs the same assertions against both
+  implementations. Covers put-call parity, VaR ≤ ES, routing optimality, IL
+  symmetry, price-time priority and bitwise determinism.
 
 ```bash
 python backend/run_sor.py                          # offline synthetic multi-venue demo
