@@ -164,6 +164,7 @@ class Ladder {
 
     bool has_bid() const noexcept { return best_bid_ != kNone; }
     bool has_ask() const noexcept { return best_ask_ != kNone; }
+    bool has_side(Side s) const noexcept { return best_idx(s) != kNone; }
     bool two_sided() const noexcept { return has_bid() && has_ask(); }
 
     // Spread in ticks. Only meaningful on a two-sided book; callers must check.

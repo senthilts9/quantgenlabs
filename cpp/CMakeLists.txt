@@ -38,7 +38,7 @@ endif()
 enable_testing()
 foreach(t engine_tests:test_engines book_tests:test_book feed_tests:test_feed
          fix_tests:test_fix fix_session_tests:test_fix_session
-         pretrade_tests:test_pretrade)
+         pretrade_tests:test_pretrade matching_tests:test_matching)
   string(REPLACE ":" ";" _pair ${t})
   list(GET _pair 0 _target)
   list(GET _pair 1 _src)
