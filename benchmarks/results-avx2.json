@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "environment": {
+    "cpu": "Intel(R) Core(TM) i5-7360U CPU @ 2.30GHz",
+    "arch": "x86_64",
+    "simd_compiled": "AVX2",
+    "simd_available_on_cpu": "AVX2",
+    "physical_cores": 2,
+    "logical_cores": 4,
+    "compiler": "clang++ 14.0.3 (clang-1403.0.22.14.1)",
+    "flags": "-O3 -std=c++20",
+    "optimised": true
+  },
+  "monte_carlo": {
+    "model": "European call, GBM, terminal-value sampling",
+    "timesteps_per_path": 1,
+    "timestep_note": "Terminal-value sampling: ONE timestep per path. A 252-step path-dependent simulation does ~252x the work per path, so this paths/sec figure is NOT comparable to a path-dependent one.",
+    "variance_reduction": "antithetic variates",
+    "rng": "std::mt19937_64, per-block substreams seeded by splitmix64(seed+block)",
+    "paths": 20000000,
+    "repetitions": 7,
+    "spot": 100.0, "strike": 100.0, "maturity_years": 1.00, "rate": 0.0300, "vol": 0.2000,
+    "bitwise_identical_across_thread_counts": true,
+    "price": 9.415557633681,
+    "scaling": [
+      {"threads": 1, "median_seconds": 0.282027, "paths_per_sec": 70915216, "best_paths_per_sec": 72074762, "worst_paths_per_sec": 51456698, "spread_pct": 39.4, "speedup": 1.0000, "efficiency": 1.0000, "oversubscribed_smt": false},
+      {"threads": 2, "median_seconds": 0.156088, "paths_per_sec": 128132930, "best_paths_per_sec": 130427711, "worst_paths_per_sec": 106206075, "spread_pct": 22.4, "speedup": 1.8068, "efficiency": 0.9034, "oversubscribed_smt": false},
+      {"threads": 4, "median_seconds": 0.130489, "paths_per_sec": 153269990, "best_paths_per_sec": 166018889, "worst_paths_per_sec": 129740645, "spread_pct": 25.8, "speedup": 2.1613, "efficiency": 0.5403, "oversubscribed_smt": true}
+    ],
+    "eight_physical_core_measured": false,
+    "eight_physical_core_note": "NOT MEASURED. This host has 2 physical cores (4 logical). No 8-core number is reported and none is extrapolated -- run this harness on an 8-core host and it will populate automatically.",
+    "smt_note": "Rows with oversubscribed_smt=true run more threads than physical cores. SMT shares execution units, so those rows are NOT evidence of per-core scaling and must not be extrapolated from."
+  },
+  "connectivity": {
+    "book_updates": {"median_per_sec": 24629603, "best_per_sec": 24792719, "worst_per_sec": 24318771, "spread_pct": 1.9},
+    "top_of_book_reads": {"median_per_sec": 383252315, "best_per_sec": 384574194, "worst_per_sec": 379271302, "spread_pct": 1.4},
+    "depth_snapshots": {"median_per_sec": 127343427, "best_per_sec": 128598764, "worst_per_sec": 121488427, "spread_pct": 5.6},
+    "feed_validations": {"median_per_sec": 30688996, "best_per_sec": 31489005, "worst_per_sec": 30457049, "spread_pct": 3.4},
+    "fix_encode": {"median_per_sec": 5772274, "best_per_sec": 5845840, "worst_per_sec": 5734747, "spread_pct": 1.9},
+    "fix_parse_validated": {"median_per_sec": 2669030, "best_per_sec": 2745823, "worst_per_sec": 2568637, "spread_pct": 6.6},
+    "fix_parse_unvalidated": {"median_per_sec": 3051500, "best_per_sec": 3053729, "worst_per_sec": 3009089, "spread_pct": 1.5},
+    "fix_field_lookups": {"median_per_sec": 116807371, "best_per_sec": 126767574, "worst_per_sec": 102227589, "spread_pct": 21.0},
+    "pretrade_checks": {"median_per_sec": 95478576, "best_per_sec": 96242843, "worst_per_sec": 94206602, "spread_pct": 2.1},
+    "end_to_end_orders": {"median_per_sec": 5492789, "best_per_sec": 5575381, "worst_per_sec": 5388873, "spread_pct": 3.4},
+    "end_to_end_note": "tick validate -> book update -> top-of-book read -> pre-trade risk -> NewOrderSingle encode, single thread, in-process. EXCLUDES network, kernel and venue time, which dominate real wire-to-wire latency."
+  },
+  "methodology": "Each figure runs a warm-up call, then repeats until a >=0.35s time floor to stay clear of clock resolution. ops/sec = total ops / elapsed wall time on an otherwise-loaded desktop OS with no CPU pinning, no isolated cores and no hugepages -- treat these as relative comparisons between implementations on this host, not as absolute production latency figures.",
+  "checksum_guard": 1.0
+}

@@ -14,7 +14,14 @@ jobs:
             g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/$b.cpp -o /tmp/$b && /tmp/$b
           done
           g++ -std=c++20 -O3 -Wall -Wextra -Icpp/include cpp/src/crypto_sim.cpp -o /tmp/crypto_sim && /tmp/crypto_sim
-          for t in test_engines test_book test_feed test_fix test_fix_session; do
+          # Benchmark harness: built and smoke-run on a tiny workload so it cannot
+          # rot. CI runners are shared and throttled, so the NUMBERS from CI are
+          # not published anywhere -- only that the harness still runs and emits
+          # valid JSON.
+          g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/mkt_bench.cpp -o /tmp/mkt_bench
+          /tmp/mkt_bench 200000 1 > /tmp/bench.json
+          python3 -c "import json;d=json.load(open('/tmp/bench.json'));assert d['schema_version']==1;assert d['monte_carlo']['timesteps_per_path']==1;print('bench JSON valid')"
+          for t in test_engines test_book test_feed test_fix test_fix_session test_pretrade; do
             g++ -std=c++20 -O2 -Wall -Wextra -pthread -Icpp/include -Icpp/tests cpp/tests/$t.cpp -o /tmp/$t && /tmp/$t
           done
   python:
