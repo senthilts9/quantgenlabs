@@ -36,7 +36,8 @@ endif()
 
 # --- tests (zero-dependency microtest harness) ---
 enable_testing()
-foreach(t engine_tests:test_engines book_tests:test_book feed_tests:test_feed)
+foreach(t engine_tests:test_engines book_tests:test_book feed_tests:test_feed
+         fix_tests:test_fix fix_session_tests:test_fix_session)
   string(REPLACE ":" ";" _pair ${t})
   list(GET _pair 0 _target)
   list(GET _pair 1 _src)
