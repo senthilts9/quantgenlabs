@@ -18,6 +18,10 @@ jobs:
           # rot. CI runners are shared and throttled, so the NUMBERS from CI are
           # not published anywhere -- only that the harness still runs and emits
           # valid JSON.
+          # The lifecycle demo is a build+run target too: it exercises the whole
+          # connectivity path, so if it stops working the composition is broken even
+          # if every unit test still passes.
+          g++ -std=c++20 -O2 -Wall -Wextra -pthread -Icpp/include cpp/src/lifecycle_demo.cpp -o /tmp/lifecycle_demo && /tmp/lifecycle_demo > /dev/null
           g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/mkt_bench.cpp -o /tmp/mkt_bench
           /tmp/mkt_bench 200000 1 > /tmp/bench.json
           python3 -c "import json;d=json.load(open('/tmp/bench.json'));assert d['schema_version']==1;assert d['monte_carlo']['timesteps_per_path']==1;print('bench JSON valid')"

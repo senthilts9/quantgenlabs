@@ -13,7 +13,7 @@ target_include_directories(engines INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
 
 find_package(Threads REQUIRED)
 
-foreach(bench quant_bench parallel_bench lsm_bench ns_bench mkt_bench)
+foreach(bench quant_bench parallel_bench lsm_bench ns_bench mkt_bench lifecycle_demo)
   add_executable(${bench} src/${bench}.cpp)
   target_link_libraries(${bench} PRIVATE engines Threads::Threads)
 endforeach()
