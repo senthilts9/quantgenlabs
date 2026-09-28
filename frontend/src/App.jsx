@@ -13,6 +13,13 @@ import "./cryptodesk/desk.css";
 // DEX board screens. Kept out of desk.css because that sheet is generated
 // from the Phase 1 source and hand edits are lost on the next regeneration.
 import "./cryptodesk/dexboard.css";
+// Palette lives in theme.js so screens in their own modules share these exact
+// tokens instead of a hand-copied duplicate that drifts a shade at a time.
+import { T, MONO } from "./theme.js";
+// Market-connectivity screens. Kept in their own modules because App.jsx is
+// already 4k lines; they share the palette via theme.js rather than a copy.
+import PerformanceLab from "./screens/PerformanceLab.jsx";
+import ConnectivityScreen from "./screens/Connectivity.jsx";
 
 /* ================================================================== *
  *  QuantGenLabs — Risk & Quant Console (full shell)
@@ -22,13 +29,6 @@ import "./cryptodesk/dexboard.css";
  *  from the C++ benchmarks in this repo.
  * ================================================================== */
 
-const T = {
-  bg: "#0E1420", panel: "#141C2A", panel2: "#101725", line: "#233144",
-  lineSoft: "#1A2536", text: "#E6ECF3", dim: "#8A99AE", faint: "#5B6B82",
-  teal: "#38BFA6", blue: "#5B9BF0", amber: "#E0A44E", red: "#E5535B",
-  green: "#46C08A", violet: "#9B87F5",
-};
-const MONO = "'IBM Plex Mono',monospace";
 
 /* ---- chart series palette ----------------------------------------------- *
  * Separate from T on purpose. T's colours do double duty as UI accents (pill
@@ -130,6 +130,12 @@ const NAV = [
   // drops when gated off; an empty group would render a bare header.
   ...(CRYPTO_DESK_ENABLED ? [{ group: "DIGITAL ASSETS", items: [
     { id: "cryptodesk", label: "Crypto Desk", icon: Coins }] }] : []),
+  // The C++ order path and its measured performance. Separate from ANALYTICS
+  // because these are engineering screens -- they describe the platform itself
+  // rather than a market.
+  { group: "MARKET CONNECTIVITY", items: [
+    { id: "connectivity", label: "Connectivity & FIX", icon: Split },
+    { id: "perflab", label: "Performance Lab", icon: Cpu }] },
   { group: "ANALYTICS", items: [
     { id: "quanthub", label: "Risk & Quant Hub", icon: Sigma },
     { id: "backtest", label: "Backtesting / TCA", icon: History },
@@ -144,7 +150,7 @@ const NAV = [
 // NAV entry without a branch surfaces immediately.
 const HANDLED = new Set(["overview", "sor", "blotter", "limits", "market", "rates",
   "backtest", "sensitivity", "stress", "optim", "genai", "models", "market-risk", "quanthub",
-  "pricing", "obs", "copilot",
+  "pricing", "obs", "copilot", "connectivity", "perflab",
   ...(CRYPTO_DESK_ENABLED ? ["cryptodesk"] : [])]);
 
 export default function Console() {
@@ -239,6 +245,8 @@ export default function Console() {
           {CRYPTO_DESK_ENABLED && view === "cryptodesk" && (
             <div className="qgl-desk"><DigitalAssetsDesk /></div>
           )}
+          {view === "connectivity" && <ConnectivityScreen />}
+          {view === "perflab" && <PerformanceLab />}
           {view === "obs" && <Observability />}
           {view === "copilot" && <Copilot />}
           {/* Every NAV id above maps to a real screen. If one is ever added
