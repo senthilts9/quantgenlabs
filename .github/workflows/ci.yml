@@ -34,7 +34,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install numpy scipy fastapi pydantic prometheus-client pytest hypothesis
+      - run: pip install numpy scipy fastapi pydantic prometheus-client pytest hypothesis pybind11
+      - name: Build pybind11 extensions (C++/Python parity tests need them)
+        run: ./scripts/build_bindings.sh
       - name: Property tests (pytest + Hypothesis)
         run: cd backend && PYTHONPATH=. pytest tests -q
       - name: Offline property runner (no test deps)
