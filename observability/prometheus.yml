@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: meridian-backend
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]   # docker-compose service name
+        labels:
+          service: meridian

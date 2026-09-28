@@ -1,0 +1,372 @@
+/* Phase 1 desk styles, mechanically scoped under .qgl-desk.
+   The source sheet sets :root custom properties named --panel, --line and
+   --teal, which the console also uses, plus bare element rules. Unscoped it
+   restyles every table and colour in the console, so each selector here is
+   confined to the desk subtree, :root is re-homed onto the wrapper, and the
+   standalone shell rules are dropped because the console supplies that
+   chrome. Regenerate from the phase1 source rather than editing by hand.
+   Keep this header free of the comment-closing token; a previous version
+   spelled an element list as a path and closed the comment early. */
+.qgl-desk{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#dce7e9;background:#071014;font-synthesis:none;--bg:#071014;--panel:#0b171c;--panel2:#0e1d22;--line:#193038;--muted:#789097;--text:#dce7e9;--teal:#27d7bd;--amber:#e6a84a;--red:#ff6b72;--blue:#66a6ff}
+.qgl-desk button,.qgl-desk input,.qgl-desk select{font:inherit}
+.qgl-desk .nav-label,.qgl-desk .desk-group label{display:block;color:#526a71;font-size:11.5px;letter-spacing:1.5px;font-weight:700;padding:8px}
+.qgl-desk .desk-nav button,.qgl-desk .desk-nav button{width:100%;border:0;background:transparent;color:#91a6ac;text-align:left;padding:8px;border-radius:4px;cursor:pointer}
+.qgl-desk .desk-nav button:hover,.qgl-desk .desk-nav button:hover{background:#0d1c21;color:#fff}
+.qgl-desk .desk-nav button.active,.qgl-desk .desk-nav button.active{background:#10272b;color:var(--teal);box-shadow:inset 2px 0 var(--teal)}
+.qgl-desk .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.qgl-desk .dot.ok{background:var(--teal)}
+.qgl-desk .desk-layout{display:grid;grid-template-columns:168px minmax(0,1fr);min-height:calc(100vh - 54px)}
+.qgl-desk .desk-nav{background:#091419;border-right:1px solid var(--line);padding:12px 8px;overflow:auto}
+.qgl-desk .desk-title{padding:8px;color:#c8d5d8;font-weight:800;font-size:13px;letter-spacing:1px}
+.qgl-desk .desk-title span{display:block;color:#526b71;font-size:10.5px;margin-top:4px}
+.qgl-desk .desk-group{margin:8px 0}
+.qgl-desk .desk-group button{font-size:13px;padding:6px 8px}
+.qgl-desk .desk-content{min-width:0;overflow:hidden}
+.qgl-desk .page{padding:16px 18px 28px}
+.qgl-desk .hero-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.qgl-desk .hero-row h1{font-size:20px;margin:0 0 3px;letter-spacing:.2px}
+.qgl-desk .hero-row p{margin:0;color:var(--muted);font-size:13px}
+.qgl-desk .panel{border:1px solid var(--line);background:linear-gradient(180deg,#0b171c,#091419);border-radius:5px;overflow:hidden;min-width:0}
+.qgl-desk .panel-head{height:38px;padding:0 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:700;letter-spacing:.3px}
+.qgl-desk .panel-body{min-width:0}
+.qgl-desk .grid{display:grid;gap:12px;margin-bottom:12px}
+.qgl-desk .grid.two{grid-template-columns:1fr 1fr}
+.qgl-desk .metric-grid{display:grid;gap:8px;margin-bottom:12px}
+.qgl-desk .metric-grid.four{grid-template-columns:repeat(4,1fr)}
+.qgl-desk .metric-grid.six{grid-template-columns:repeat(6,1fr)}
+.qgl-desk .metric{background:#0b171c;border:1px solid var(--line);padding:11px;border-radius:4px;min-width:0}
+.qgl-desk .metric span{display:block;color:#71888e;font-size:11.5px;text-transform:uppercase;letter-spacing:.8px}
+.qgl-desk .metric strong{display:block;font-size:17px;margin-top:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.qgl-desk .metric small{color:#60777d;font-size:11.5px}
+.qgl-desk .positive{color:var(--teal)!important}
+.qgl-desk .negative{color:var(--red)!important}
+.qgl-desk .warning{color:var(--amber)!important}
+.qgl-desk .muted{color:var(--muted);font-weight:400}
+.qgl-desk .status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;letter-spacing:.5px;color:#9cb0b5;white-space:nowrap}
+.qgl-desk .status i{width:6px;height:6px;border-radius:50%;background:#698087}
+.qgl-desk .status.healthy i,.qgl-desk .status.normal i,.qgl-desk .status.pass i,.qgl-desk .status.complete i,.qgl-desk .status.success i,.qgl-desk .status.validated i,.qgl-desk .status.filled i{background:var(--teal)}
+.qgl-desk .status.warning i,.qgl-desk .status.approval i,.qgl-desk .status.partial i,.qgl-desk .status.investigating i,.qgl-desk .status.running i{background:var(--amber)}
+.qgl-desk .status.critical i,.qgl-desk .status.failed i,.qgl-desk .status.rejected i,.qgl-desk .status.high i{background:var(--red)}
+.qgl-desk .status.working i,.qgl-desk .status.accepted i,.qgl-desk .status.pending i,.qgl-desk .status.open i{background:var(--blue)}
+.qgl-desk table{width:100%;border-collapse:collapse;font-size:12.5px}
+.qgl-desk th{text-align:left;color:#617a80;font-size:11px;letter-spacing:.65px;padding:8px 10px;border-bottom:1px solid var(--line);background:#091519}
+.qgl-desk td{padding:8px 10px;border-bottom:1px solid #12272d;color:#9eb0b5;white-space:nowrap}
+.qgl-desk tr:hover td{background:#0d1c21}
+.qgl-desk .strong{color:#d7e2e4;font-weight:700}
+.qgl-desk .link{color:#6fb8ff;cursor:pointer}
+.qgl-desk .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.qgl-desk .block{display:block;color:#60777d;margin-top:2px}
+.qgl-desk .dense td{padding:7px 8px}
+.qgl-desk .tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:10px}
+.qgl-desk .tabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:#748b91;padding:9px 14px;cursor:pointer}
+.qgl-desk .tabs button.active{color:var(--teal);border-color:var(--teal)}
+.qgl-desk .instrument-bar{display:flex;align-items:center;gap:16px;background:#0b171c;border:1px solid var(--line);padding:10px 12px;margin-bottom:10px;border-radius:4px}
+.qgl-desk .instrument-bar div b{display:block}
+.qgl-desk .instrument-bar div span{font-size:11.5px;color:var(--muted)}
+.qgl-desk .instrument-bar strong{font-size:18px;font-family:ui-monospace,monospace}
+.qgl-desk .instrument-bar>.status{margin-left:auto}
+.qgl-desk .workstation{display:grid;grid-template-columns:190px minmax(320px,1fr) 300px;gap:8px}
+.qgl-desk .watch button{width:100%;display:flex;justify-content:space-between;text-align:left;padding:9px;background:transparent;border:0;border-bottom:1px solid #12272d;color:#b5c3c6;cursor:pointer}
+.qgl-desk .watch button.selected{background:#10272b;box-shadow:inset 2px 0 var(--teal)}
+.qgl-desk .watch button div:last-child{text-align:right}
+.qgl-desk .watch small{display:block;font-size:11.5px;color:#657b81}
+.qgl-desk .book-head,.qgl-desk .book-row{display:grid;grid-template-columns:1fr 1fr 1fr;padding:4px 12px;font-family:ui-monospace,monospace}
+.qgl-desk .book-head{font-size:10.5px;color:#60777d;border-bottom:1px solid var(--line)}
+.qgl-desk .book-row span:nth-child(n+2){text-align:right}
+.qgl-desk .book-row.ask span:first-child{color:#f08086}
+.qgl-desk .book-row.bid span:first-child{color:#45d7bd}
+.qgl-desk .mid{padding:7px 12px;border-block:1px solid var(--line);display:flex;justify-content:space-between}
+.qgl-desk .mid b{color:var(--teal)}
+.qgl-desk .mid span{color:#60777d;font-size:11.5px}
+.qgl-desk .ticket .panel-body{padding:10px}
+.qgl-desk .ticket label,.qgl-desk .form-row label{display:block;color:#6d858b;font-size:11.5px;margin:8px 0}
+.qgl-desk .ticket input,.qgl-desk .ticket select,.qgl-desk .form-row input,.qgl-desk .form-row select{width:100%;margin-top:4px;background:#081216;border:1px solid #203941;color:#dce7e9;padding:8px;border-radius:3px}
+.qgl-desk .seg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.qgl-desk .seg button{padding:8px;background:#0b171c;border:1px solid var(--line);color:#789097}
+.qgl-desk .seg .buy.active{border-color:var(--teal);color:var(--teal);background:#0d2926}
+.qgl-desk .seg .sell.active{border-color:var(--red);color:var(--red);background:#291315}
+.qgl-desk .ticket-summary{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+.qgl-desk .ticket-summary span{display:flex;justify-content:space-between;padding:3px 0;color:#71888e;font-size:11.5px}
+.qgl-desk .ticket-summary b{color:#cbd8da}
+.qgl-desk .submit,.qgl-desk .primary{width:100%;border:0;border-radius:3px;padding:10px;font-weight:800;cursor:pointer;margin-top:10px}
+.qgl-desk .submit.buy,.qgl-desk .primary{background:#1fbaa5;color:#04100f}
+.qgl-desk .submit.sell{background:#e35f67;color:white}
+.qgl-desk .disclaimer{display:block;color:#50666c;font-size:10.5px;line-height:1.4;margin-top:8px}
+.qgl-desk .mini{background:#10242a;color:#a9bbc0;border:1px solid #24414a;border-radius:3px;padding:4px 7px;cursor:pointer}
+.qgl-desk .limit-row{padding:9px 12px;border-bottom:1px solid #12272d}
+.qgl-desk .limit-row>div:first-child{display:flex;justify-content:space-between}
+.qgl-desk .limit-row span{color:#82979c}
+.qgl-desk .bar{height:4px;background:#14282e;border-radius:5px;overflow:hidden;margin-top:6px}
+.qgl-desk .bar i{display:block;height:100%;background:var(--teal)}
+.qgl-desk .limit-row small{color:#50666c;font-size:10.5px}
+.qgl-desk .service-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line)}
+.qgl-desk .service{background:#0b171c;padding:10px;display:grid;grid-template-columns:1fr auto;gap:4px}
+.qgl-desk .service b{font-size:12px}
+.qgl-desk .service span,.qgl-desk .service small{color:#6e858b;font-size:11.5px}
+.qgl-desk .timeline{padding:12px}
+.qgl-desk .timeline div{padding:8px;border-left:1px solid #28424a;color:#8fa3a8}
+.qgl-desk .timeline i{display:inline-block;width:7px;height:7px;background:var(--teal);border-radius:50%;margin-left:-12px;margin-right:10px}
+.qgl-desk .route{padding:12px}
+.qgl-desk .route>span{float:right;color:#6f878d}
+.qgl-desk .route .bar{margin:4px 0 12px}
+.qgl-desk .bars{padding:12px}
+.qgl-desk .bars>div{display:grid;grid-template-columns:80px 1fr 45px;gap:8px;align-items:center;margin:10px 0}
+.qgl-desk .bars .bar{margin:0}
+.qgl-desk .cost-grid{display:grid;grid-template-columns:1fr 1fr}
+.qgl-desk .cost-grid div{padding:16px;border:1px solid #12272d}
+.qgl-desk .cost-grid span{display:block;color:#6e858b;font-size:11.5px}
+.qgl-desk .cost-grid b{font-size:16px}
+.qgl-desk .sparkline{height:120px;display:flex;align-items:end;gap:5px;padding:18px}
+.qgl-desk .sparkline i{flex:1;background:#1aa994;min-height:5px;opacity:.75}
+.qgl-desk .form-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px;align-items:end}
+.qgl-desk .form-row .primary{margin-bottom:8px}
+.qgl-desk .settlement-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px}
+.qgl-desk .settlement-flow>div{border:1px solid var(--line);padding:12px;background:#0c1a1f}
+.qgl-desk .settlement-flow span{display:block;color:#4e686f;font-size:11.5px}
+.qgl-desk .settlement-flow b{display:block;margin:5px 0 10px}
+.qgl-desk .pipeline{padding:22px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px}
+.qgl-desk .pipeline span{border:1px solid #244049;padding:9px;background:#0d1e23}
+.qgl-desk .pipeline b{margin-left:8px;color:var(--teal)}
+.qgl-desk .placeholder{padding:30px}
+.qgl-desk .placeholder .panel-body{padding:20px}
+.qgl-desk .empty{padding:30px;color:#60777d;text-align:center}
+/* The scoping pass that produced this file flattened the two breakpoints
+   below into unconditional rules, so every width got the narrowest layout:
+   `.workstation` collapsed to one column at 2560px as readily as at 900px,
+   which stacks the ticket under the book instead of beside it. Restored as
+   the media queries they plainly were. */
+@media (max-width:1500px){
+  .qgl-desk .metric-grid.six{grid-template-columns:repeat(3,1fr)}
+  .qgl-desk .workstation{grid-template-columns:170px 1fr}
+  .qgl-desk .ticket{grid-column:1/-1}
+  .qgl-desk .service-grid{grid-template-columns:repeat(2,1fr)}
+  .qgl-desk .desk-layout{grid-template-columns:140px minmax(0,1fr)}
+}
+@media (max-width:1100px){
+  .qgl-desk .grid.two,.qgl-desk .metric-grid.four,.qgl-desk .metric-grid.six{grid-template-columns:1fr 1fr}
+  .qgl-desk .workstation{grid-template-columns:1fr}
+  .qgl-desk .ticket{grid-column:auto}
+  .qgl-desk .settlement-flow{grid-template-columns:1fr 1fr}
+  .qgl-desk .form-row{grid-template-columns:1fr 1fr}
+  .qgl-desk .panel{overflow:auto}
+}
+
+.qgl-desk .desk-nav button{position:relative;padding-right:40px}
+.qgl-desk .prov{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:9.5px;letter-spacing:.5px;font-weight:700;padding:2px 4px;border-radius:2px}
+.qgl-desk .prov.live{color:#04100f;background:var(--teal)}
+.qgl-desk .prov.sim{color:#7d8f95;background:#16272d;border:1px solid #24414a}
+.qgl-desk .desk-legend{margin-top:14px;padding:10px 8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;color:#6e858b;font-size:11px}
+.qgl-desk .prov-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.qgl-desk .prov-dot.live{background:var(--teal)}
+.qgl-desk .prov-dot.sim{background:#31505a}
+
+/* ========================================================================
+   Trade screen, rebuilt to the venue layout in the reference screenshots.
+   Hand-written: these screens have no phase1 source to regenerate from.
+   ======================================================================== */
+
+.qgl-desk .desk-topbar{display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--line);background:#091419;font-size:12px}
+.qgl-desk .desk-topbar .spacer{flex:1}
+.qgl-desk .desk-topbar b{color:#cbd8da;font-family:ui-monospace,monospace}
+.qgl-desk .desk-topbar .deposit{background:#1fbaa5;color:#04100f;border:0;border-radius:4px;padding:6px 16px;font-weight:700;cursor:pointer}
+.qgl-desk .desk-topbar .login{background:#12262c;color:var(--teal);border:1px solid #24414a;border-radius:4px;padding:6px 16px;font-weight:700;cursor:pointer}
+.qgl-desk .addr-pill{display:flex;align-items:center;gap:7px;background:#101c21;border:1px solid #1d343c;border-radius:20px;padding:4px 12px 4px 5px;color:#b5c3c6;font-family:ui-monospace,monospace;font-size:12px;cursor:pointer}
+.qgl-desk .avatar{width:44px;height:44px;border-radius:50%;background:conic-gradient(from 210deg,#7c5cff,#2dd4bf,#f6465d,#7c5cff);flex:none}
+.qgl-desk .avatar.sm{width:18px;height:18px}
+.qgl-desk .small{font-size:11.5px}
+
+/* ---- instrument bar ---- */
+.qgl-desk .inst-bar{display:flex;align-items:center;gap:22px;padding:9px 14px;border-bottom:1px solid var(--line);background:#091419;overflow-x:auto}
+.qgl-desk .inst-name{display:flex;align-items:center;gap:7px;flex:none}
+.qgl-desk .inst-name b{font-size:14px;color:#e6eef0}
+.qgl-desk .inst-name .coin{width:20px;height:20px;border-radius:50%;background:#f7931a;color:#160c00;font-weight:800;font-size:13px;display:grid;place-items:center}
+.qgl-desk .tag{font-size:10.5px;letter-spacing:.6px;color:#7d949a;border:1px solid #24414a;border-radius:3px;padding:1px 4px}
+.qgl-desk .inst-stat{display:flex;flex-direction:column;gap:3px;flex:none}
+.qgl-desk .inst-stat span{color:#6d858b;font-size:11.5px;white-space:nowrap}
+.qgl-desk .inst-stat b{font-size:13px;font-family:ui-monospace,monospace;color:#d7e2e4}
+.qgl-desk .inst-stat.big b{font-size:17px;color:var(--teal)}
+.qgl-desk .inst-bar>.status{margin-left:auto;flex:none}
+
+/* ---- three-column trade grid ---- */
+.qgl-desk .trade-grid{display:grid;grid-template-columns:150px minmax(230px,1fr) 300px;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.qgl-desk .trade-grid>*{background:#0a1418;min-width:0}
+.qgl-desk .markets button{width:100%;text-align:left;padding:9px 11px;background:transparent;border:0;border-bottom:1px solid #12272d;color:#b5c3c6;cursor:pointer}
+.qgl-desk .markets button.selected{background:#10272b;box-shadow:inset 2px 0 var(--teal)}
+.qgl-desk .markets small{display:block;font-size:11px;color:#657b81;margin-top:2px}
+
+/* ---- book ---- */
+.qgl-desk .book-col{display:flex;flex-direction:column}
+.qgl-desk .ord-tabs{display:flex;align-items:center;border-bottom:1px solid var(--line)}
+.qgl-desk .ord-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:#748b91;padding:8px 12px;cursor:pointer;font-size:12.5px}
+.qgl-desk .ord-tabs button.active{color:#e6eef0;border-color:var(--teal)}
+.qgl-desk .ord-tabs .spacer{flex:1}
+.qgl-desk .ord-tabs.sub button{padding:7px 10px;font-size:12px}
+.qgl-desk .book-head{display:grid;grid-template-columns:1.1fr 1fr 1fr;padding:5px 11px;font-size:11px;color:#60777d;border-bottom:1px solid var(--line)}
+.qgl-desk .book-head span:nth-child(n+2){text-align:right}
+.qgl-desk .book-side{display:flex;flex-direction:column}
+.qgl-desk .book-side.asks{flex-direction:column-reverse}
+.qgl-desk .book-row{position:relative;display:grid;grid-template-columns:1.1fr 1fr 1fr;padding:2.5px 11px;font-family:ui-monospace,monospace;font-size:12px;cursor:default}
+.qgl-desk .book-row i{position:absolute;right:0;top:0;bottom:0;opacity:.13}
+.qgl-desk .book-row.ask i{background:var(--red)}
+.qgl-desk .book-row.bid i{background:var(--teal)}
+.qgl-desk .book-row span{position:relative}
+/* The phase1 sheet right-aligns every span from the 2nd on. This markup puts a
+   depth bar in slot 1, so the price lands in slot 2 and must be re-left-aligned
+   explicitly — otherwise the price column right-aligns against the size column. */
+.qgl-desk .book-row span:nth-child(2){text-align:left}
+.qgl-desk .book-row span:nth-child(n+3){text-align:right;color:#8fa3a8}
+.qgl-desk .book-row.ask span:nth-child(2){color:#f08086}
+.qgl-desk .book-row.bid span:nth-child(2){color:#45d7bd}
+.qgl-desk .book-row:hover{background:#0f1f25}
+.qgl-desk .book-mid{display:flex;align-items:baseline;justify-content:space-between;padding:7px 11px;border-block:1px solid var(--line);background:#0b181d}
+.qgl-desk .book-mid>b{font-size:15px;color:var(--teal);font-family:ui-monospace,monospace}
+.qgl-desk .book-mid span{color:#60777d;font-size:11.5px}
+.qgl-desk .book-mid span b{color:#9eb0b5;font-family:ui-monospace,monospace}
+
+/* ---- ticket ---- */
+.qgl-desk .ticket-col{display:flex;flex-direction:column}
+.qgl-desk .ticket-panel{padding:9px 11px;display:flex;flex-direction:column}
+.qgl-desk .mode-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:9px}
+.qgl-desk .pill{background:#102026;border:1px solid #24414a;color:#c3d1d4;border-radius:4px;padding:6px;font-size:12px;cursor:pointer}
+.qgl-desk .pill:hover,.qgl-desk .pill.open{border-color:var(--teal);color:var(--teal)}
+.qgl-desk .lev-pop{background:#0b181d;border:1px solid #24414a;border-radius:4px;padding:10px;margin-bottom:9px}
+.qgl-desk .lev-head{display:flex;justify-content:space-between;font-size:12px;color:#7f959b}
+.qgl-desk .lev-head b{color:var(--teal);font-family:ui-monospace,monospace}
+.qgl-desk .lev-scale{display:flex;justify-content:space-between;font-size:11px;color:#5a7178;margin-top:2px}
+.qgl-desk .lev-note{margin-top:7px;font-size:11px;color:#60777d;line-height:1.5}
+.qgl-desk .ticket-panel input[type=range],.qgl-desk .size-slider{width:100%;accent-color:#1fbaa5;background:transparent;border:0;padding:0;margin:6px 0 0}
+.qgl-desk .pro-row{display:grid;gap:7px;margin-bottom:9px}
+.qgl-desk .pro-row label,.qgl-desk .size-field label{display:block;color:#6d858b;font-size:11.5px;margin-bottom:3px}
+.qgl-desk .pro-row select,.qgl-desk .pro-row input{width:100%;background:#081216;border:1px solid #203941;color:#dce7e9;padding:7px;border-radius:3px}
+.qgl-desk .bs-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:2px 0 10px}
+.qgl-desk .bs{padding:9px;border-radius:4px;border:1px solid var(--line);background:#0b171c;color:#789097;font-weight:700;cursor:pointer}
+.qgl-desk .bs.buy.active{background:#1fbaa5;border-color:#1fbaa5;color:#04100f}
+.qgl-desk .bs.sell.active{background:#e35f67;border-color:#e35f67;color:#fff}
+.qgl-desk .t-row{display:flex;justify-content:space-between;align-items:baseline;padding:3.5px 0;font-size:12px;color:#7f959b}
+.qgl-desk .t-row b{color:#d7e2e4;font-family:ui-monospace,monospace}
+.qgl-desk .size-field{position:relative;margin:9px 0 0}
+.qgl-desk .size-field input{width:100%;background:#081216;border:1px solid #203941;color:#dce7e9;padding:9px 78px 9px 9px;border-radius:3px;font-family:ui-monospace,monospace}
+.qgl-desk .unit-toggle{position:absolute;right:4px;bottom:4px;display:flex;gap:2px}
+.qgl-desk .unit-toggle button{background:#102026;border:1px solid #24414a;color:#7d949a;font-size:11.5px;padding:4px 7px;border-radius:3px;cursor:pointer}
+.qgl-desk .unit-toggle button.active{background:#16333a;color:var(--teal);border-color:var(--teal)}
+.qgl-desk .slider-scale{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:4px}
+.qgl-desk .slider-scale button{background:transparent;border:0;color:#5a7178;font-size:11px;cursor:pointer;padding:3px 0}
+.qgl-desk .slider-scale button:hover:not(:disabled){color:var(--teal)}
+.qgl-desk .slider-scale button:disabled{opacity:.4;cursor:not-allowed}
+.qgl-desk label.chk{display:flex;align-items:center;gap:7px;margin:7px 0;font-size:12px;color:#8fa3a8;cursor:pointer}
+.qgl-desk label.chk input{width:auto;margin:0;accent-color:#1fbaa5}
+.qgl-desk .tpsl{border:1px solid var(--line);border-radius:4px;padding:8px;margin:4px 0 8px;background:#0b181d}
+.qgl-desk .tpsl-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:6px}
+.qgl-desk .tpsl-row input{background:#081216;border:1px solid #203941;color:#dce7e9;padding:6px;border-radius:3px;font-family:ui-monospace,monospace;font-size:12px;width:100%}
+.qgl-desk .tpsl-row span{font-size:12px;font-family:ui-monospace,monospace;white-space:nowrap}
+.qgl-desk .rr{font-size:11.5px;color:#6d858b;text-align:right}
+.qgl-desk .rr b{color:#cbd8da}
+.qgl-desk .confirm{width:100%;border:0;border-radius:4px;padding:11px;font-weight:800;cursor:pointer;margin:9px 0 10px;font-size:13px}
+.qgl-desk .confirm.buy{background:#1fbaa5;color:#04100f}
+.qgl-desk .confirm.sell{background:#e35f67;color:#fff}
+.qgl-desk .confirm.connect{background:#16333a;color:var(--teal);border:1px solid var(--teal)}
+.qgl-desk .confirm:disabled{opacity:.45;cursor:not-allowed}
+.qgl-desk .read{display:flex;justify-content:space-between;align-items:baseline;padding:3.5px 0;font-size:12px;color:#7f959b}
+.qgl-desk .read b{color:#d7e2e4;font-family:ui-monospace,monospace}
+.qgl-desk .read .editable{cursor:pointer;border-bottom:1px dotted #3c5b64}
+.qgl-desk .read input.slip{width:74px;background:#081216;border:1px solid var(--teal);color:#dce7e9;padding:2px 5px;border-radius:3px;font-family:ui-monospace,monospace;font-size:12px;text-align:right}
+.qgl-desk .readout{border-top:1px solid var(--line);margin-top:4px;padding-top:7px}
+
+/* ---- account panel ---- */
+.qgl-desk .acct-panel{border-top:1px solid var(--line);padding:0 11px 10px;margin-top:auto}
+.qgl-desk .acct-panel .ord-tabs{margin:0 -11px 7px}
+.qgl-desk .acct-note{margin-top:8px;font-size:11px;color:#5a7178;line-height:1.55}
+
+/* ---- bottom tab strip ---- */
+.qgl-desk .desk-tabs{border-top:1px solid var(--line);background:#0a1418}
+.qgl-desk .ord-tabs.strip{padding:0 11px;background:#091419}
+.qgl-desk .tab-body{max-height:290px;overflow:auto}
+.qgl-desk .risk-head{display:flex;flex-wrap:wrap;gap:18px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px;color:#6d858b}
+.qgl-desk .risk-head b{color:#d7e2e4;font-family:ui-monospace,monospace;margin-left:5px}
+.qgl-desk .risk-split{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.qgl-desk .risk-split>table{background:#0a1418}
+
+/* ---- notices ---- */
+.qgl-desk .notice{margin-top:9px;padding:8px 10px;border-radius:3px;font-size:12px;line-height:1.55;border:1px solid}
+.qgl-desk ul.notice{list-style:none;padding-left:10px}
+.qgl-desk ul.notice li{margin:2px 0}
+.qgl-desk ul.notice li::before{content:"› ";opacity:.6}
+.qgl-desk .notice.reject{border-color:#4a2126;background:#1a0f11;color:#f0959a}
+.qgl-desk .notice.warn{border-color:#4a3c1f;background:#171208;color:#e0b878}
+.qgl-desk .notice.ok{border-color:#1d4a42;background:#0a1a18;color:#63d8c3}
+.qgl-desk .disclaimer{display:block;color:#50666c;font-size:10.5px;line-height:1.5;margin-top:9px}
+
+/* ---- modals ---- */
+.qgl-desk .modal-backdrop{position:fixed;inset:0;background:rgba(3,8,10,.74);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px}
+.qgl-desk .modal-card{width:min(430px,100%);max-height:86vh;display:flex;flex-direction:column;background:#0c181d;border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.6)}
+.qgl-desk .modal-body{padding:13px;overflow:auto}
+.qgl-desk .modal-body label{display:block;color:#6d858b;font-size:11.5px;margin:10px 0}
+.qgl-desk .modal-body input,.qgl-desk .modal-body select,.qgl-desk .modal-body textarea{width:100%;margin-top:4px;background:#081216;border:1px solid #203941;color:#dce7e9;padding:9px;border-radius:4px;font-family:inherit}
+.qgl-desk .modal-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;border-top:1px solid var(--line)}
+.qgl-desk .primary{background:#1fbaa5;color:#04100f;border:0;border-radius:4px;padding:9px 16px;font-weight:800;cursor:pointer}
+.qgl-desk .primary.wide{width:100%;margin-top:8px}
+.qgl-desk .primary:disabled{opacity:.45;cursor:not-allowed}
+.qgl-desk .mini{background:#10242a;color:#a9bbc0;border:1px solid #24414a;border-radius:3px;padding:5px 9px;cursor:pointer;font-size:12px}
+.qgl-desk .kv{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;font-size:12px;color:#7f959b}
+.qgl-desk .kv b{color:#cbd8da}
+.qgl-desk .kv small{color:#60777d;font-weight:400}
+.qgl-desk .kv-block{margin-top:10px;padding:9px 11px;border:1px solid var(--line);border-radius:4px;background:#081216}
+.qgl-desk .bracket-head{color:#617a80;font-size:11px;letter-spacing:.7px;text-transform:uppercase;margin:14px 0 4px}
+.qgl-desk .route-card{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:#0e1c22;border:1px solid #1d343c;border-radius:6px;padding:12px;color:#d7e2e4;cursor:pointer;margin-top:8px}
+.qgl-desk .route-card:hover:not(.disabled){border-color:var(--teal)}
+.qgl-desk .route-card small{display:block;color:#6d858b;font-size:11.5px;margin-top:3px}
+.qgl-desk .route-card span{color:#5a7178;font-size:16px}
+.qgl-desk .route-card.disabled{opacity:.45;cursor:not-allowed}
+.qgl-desk .wallet-head{display:flex;align-items:center;gap:12px;padding:4px 0 10px}
+.qgl-desk .wallet-head b{font-size:15px;display:block}
+.qgl-desk .wallet-head small{color:#6d858b;font-size:11.5px}
+.qgl-desk .wallet-cta{padding:6px 0}
+.qgl-desk .addr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0e1c22;border:1px solid #1d343c;border-radius:6px;padding:10px 11px;margin-top:7px}
+.qgl-desk .addr-row span{display:block;color:#6d858b;font-size:11.5px;margin-bottom:3px}
+.qgl-desk .addr-row b{font-size:12.5px}
+
+/* ---- order toast ---- */
+.qgl-desk .toast{position:fixed;right:18px;bottom:18px;width:290px;background:#0c181d;border:1px solid var(--line);border-radius:6px;box-shadow:0 12px 34px rgba(0,0,0,.55);z-index:70;padding:10px 12px}
+.qgl-desk .toast.bad{border-color:#4a2126}
+.qgl-desk .toast.ok{border-color:#1d4a42}
+.qgl-desk .toast header{display:flex;align-items:center;gap:7px;font-size:12px;color:#8fa3a8;margin-bottom:7px}
+.qgl-desk .toast header .spacer{flex:1}
+.qgl-desk .toast header b{color:#e6eef0;font-size:13px}
+.qgl-desk .toast .mini{padding:1px 5px}
+
+@media (max-width:1400px){
+  .qgl-desk .trade-grid{grid-template-columns:130px minmax(200px,1fr) 280px}
+  .qgl-desk .inst-bar{gap:15px}
+}
+@media (max-width:1100px){
+  .qgl-desk .trade-grid{grid-template-columns:1fr}
+  .qgl-desk .risk-split{grid-template-columns:1fr}
+  .qgl-desk .toast{left:18px;right:18px;width:auto}
+}
+.qgl-desk .t-row b{display:inline-flex;align-items:center;gap:7px}
+.qgl-desk .mini.inline{padding:1px 6px;font-size:11px}
+.qgl-desk .net{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;padding:2px 6px;border-radius:3px;border:1px solid}
+.qgl-desk .net.mainnet{color:#ffb4b8;border-color:#5c2a30;background:#241013}
+.qgl-desk .net.testnet{color:#9ecbff;border-color:#24414a;background:#0e1c22}
+.qgl-desk .net.simulated{color:#8fa3a8;border-color:#24414a;background:#0e1c22}
+.qgl-desk .net.unknown{color:#6d858b;border-color:#2a3a40;background:#0c1519}
+
+/* ---- wallet chooser + toast action ---- */
+.qgl-desk .modal-lede{color:#8fa3a8;font-size:12px;line-height:1.6;margin:0 0 12px}
+.qgl-desk .wallet-row{width:100%;display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:12px;background:#0e1c22;border:1px solid #1d343c;border-radius:8px;padding:13px;margin-top:9px;color:#d7e2e4;cursor:pointer;text-align:left;font-size:13px}
+.qgl-desk .wallet-row:hover:not(:disabled){border-color:var(--teal);background:#112329}
+.qgl-desk .wallet-row:disabled{opacity:.55;cursor:wait}
+.qgl-desk .wallet-row img{border-radius:6px}
+.qgl-desk .wallet-row span{color:#6d858b;font-size:12px}
+.qgl-desk .wallet-glyph{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#1fbaa5,#66a6ff)}
+.qgl-desk .toast .t-row.wrap{align-items:flex-start}
+.qgl-desk .toast .t-row.wrap b{white-space:normal;text-align:right;line-height:1.45;font-family:inherit}
+.qgl-desk .toast .primary.wide{margin-top:10px;padding:9px}
+.qgl-desk .rescan{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;color:#6d858b;font-size:11.5px}
+
+/* A wide table must scroll inside its panel rather than be clipped by it.
+   `.panel` is overflow:hidden to keep its rounded corners; that also silently
+   truncated the last columns of any table wider than the panel. Scrolling the
+   body instead keeps the corners and keeps the data reachable. */
+.qgl-desk .panel-body{overflow-x:auto}
+.qgl-desk .panel-body table{min-width:max-content}

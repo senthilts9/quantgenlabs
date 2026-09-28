@@ -1,0 +1,179 @@
+{
+  "title": "Meridian \u2014 Engine & Risk Observability",
+  "uid": "meridian-engines",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "engine",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(meridian_engine_latency_seconds_bucket, engine)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Engine latency p99 (ms) by engine/impl",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "expr": "1000 * histogram_quantile(0.99, sum by (engine, impl, le) (rate(meridian_engine_latency_seconds_bucket{engine=~\"$engine\"}[1m])))",
+          "legendFormat": "{{engine}}/{{impl}} p99"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Engine latency p50 / p95 / p99 (ms)",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "expr": "1000 * histogram_quantile(0.50, sum by (engine, le) (rate(meridian_engine_latency_seconds_bucket{engine=~\"$engine\"}[1m])))",
+          "legendFormat": "{{engine}} p50"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.95, sum by (engine, le) (rate(meridian_engine_latency_seconds_bucket{engine=~\"$engine\"}[1m])))",
+          "legendFormat": "{{engine}} p95"
+        },
+        {
+          "expr": "1000 * histogram_quantile(0.99, sum by (engine, le) (rate(meridian_engine_latency_seconds_bucket{engine=~\"$engine\"}[1m])))",
+          "legendFormat": "{{engine}} p99"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Engine call rate (req/s)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 9
+      },
+      "targets": [
+        {
+          "expr": "sum by (engine, impl) (rate(meridian_engine_calls_total[1m]))",
+          "legendFormat": "{{engine}}/{{impl}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Engine error rate (err/s)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 9
+      },
+      "targets": [
+        {
+          "expr": "(sum by (engine) (rate(meridian_engine_errors_total[5m]))) or vector(0)",
+          "legendFormat": "{{engine}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "C++ vs numpy speedup \u2014 controlled workload (p50)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 2
+              }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "targets": [
+        {
+          "expr": "meridian_calibration_speedup_ratio",
+          "legendFormat": "{{engine}}"
+        }
+      ],
+      "description": "Measured by services.engine_calibration: one fixed workload run down both paths back to back every 30s. Not a histogram quantile \u2014 an exact ratio of two timings on identical inputs."
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "HTTP request latency p99 (s) by route",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (path, le) (rate(meridian_http_request_seconds_bucket[1m])))",
+          "legendFormat": "{{path}} p99"
+        }
+      ]
+    }
+  ]
+}

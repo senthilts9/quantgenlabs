@@ -1,0 +1,9 @@
+import { Panel, Metric, StatusPill } from "../../components/UI";
+export function AlgoExecution(){
+ const algos=[["ALG-9012","BTC-USD-PERP","VWAP","BUY","3.00","1.50","50%","RUNNING"],["ALG-9011","SOL-USD-PERP","TWAP","BUY","500","320","64%","RUNNING"],["ALG-9009","XRP-USD","POV 10%","BUY","25,000","25,000","100%","COMPLETE"]];
+ return <div className="page"><div className="hero-row"><div><h1>Algo Execution</h1><p>Parent/child order scheduling and execution supervision</p></div><StatusPill status="EXECUTION ENGINE · SIMULATED"/></div>
+ <div className="metric-grid four"><Metric label="Active Parents" value="2"/><Metric label="Child Orders Today" value="184"/><Metric label="Fill Ratio" value="92.4%"/><Metric label="Avg Participation" value="8.7%"/></div>
+ <Panel title="Parent Orders"><table><thead><tr><th>PARENT</th><th>INSTRUMENT</th><th>ALGO</th><th>SIDE</th><th>TARGET</th><th>FILLED</th><th>PROGRESS</th><th>STATUS</th></tr></thead><tbody>{algos.map(a=><tr key={a[0]}><td className="link">{a[0]}</td><td className="strong">{a[1]}</td><td>{a[2]}</td><td>{a[3]}</td><td>{a[4]}</td><td>{a[5]}</td><td><div className="bar"><i style={{width:a[6]}}/></div></td><td><StatusPill status={a[7]}/></td></tr>)}</tbody></table></Panel>
+ <div className="grid two"><Panel title="Schedule / Slices"><div className="timeline">{["11:05 Slice 01 · FILLED","11:10 Slice 02 · FILLED","11:15 Slice 03 · WORKING","11:20 Slice 04 · SCHEDULED","11:25 Slice 05 · SCHEDULED"].map(x=><div key={x}><i/>{x}</div>)}</div></Panel><Panel title="Routing Decision"><div className="route"><b>SIM-X1</b><span>Score 0.91 · 55%</span><div className="bar"><i style={{width:"55%"}}/></div><b>SIM-X2</b><span>Score 0.84 · 30%</span><div className="bar"><i style={{width:"30%"}}/></div><b>SIM-AMM</b><span>Score 0.72 · 15%</span><div className="bar"><i style={{width:"15%"}}/></div></div></Panel></div>
+ </div>
+}

@@ -1,0 +1,93 @@
+/* Styles for the DEX board screens (Markets, Options, Vaults, Funding).
+
+   **Deliberately not in `desk.css`.** That sheet is mechanically generated
+   from the Phase 1 source and carries a "regenerate rather than edit by hand"
+   warning, so anything added there is lost on the next sync. These screens
+   have no Phase 1 origin — they were written here — so their styles live in a
+   file the generator does not own.
+
+   Scoped under `.qgl-desk` on every selector, for the same reason desk.css is:
+   the desk mounts inside the console, and a bare `table` or `:root` rule here
+   would restyle the whole application. */
+
+/* -- expiry chips ---------------------------------------------------------
+   A select would hide eleven of the twelve listed expiries behind a click.
+   The whole strip is the information: where the listings cluster, and how far
+   out the surface goes. */
+.qgl-desk .chip-row{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+.qgl-desk .chip{display:flex;flex-direction:column;align-items:center;gap:1px;
+  background:#0d1c21;border:1px solid #1d3740;color:#9eb0b5;border-radius:4px;
+  padding:6px 11px;cursor:pointer;line-height:1.25;font-size:12px}
+.qgl-desk .chip:hover{background:#12262c;color:#dce7e9}
+.qgl-desk .chip small{color:#617a80;font-size:10px;letter-spacing:.4px}
+.qgl-desk .chip.active{border-color:var(--teal);color:var(--teal);background:#0c2028}
+.qgl-desk .chip.active small{color:var(--teal);opacity:.8}
+
+/* -- option chain ---------------------------------------------------------
+   Calls read outward to the left of the strike and puts outward to the right,
+   which is the convention a chain is read in. The strike column is the spine
+   and is sticky so it stays visible while the greeks scroll. */
+.qgl-desk table.chain th.side-call{color:var(--teal);text-align:center;letter-spacing:1.2px;
+  border-bottom:1px solid #1d3740}
+.qgl-desk table.chain th.side-put{color:var(--blue);text-align:center;letter-spacing:1.2px;
+  border-bottom:1px solid #1d3740}
+.qgl-desk table.chain .strike-col{position:sticky;left:0;z-index:2;
+  background:#0a1a1f;text-align:center;color:#dce7e9;font-weight:600;
+  border-left:1px solid #1d3740;border-right:1px solid #1d3740}
+.qgl-desk table.chain th.strike-col{background:#091519;z-index:3}
+.qgl-desk table.chain td{font-size:12px;text-align:right}
+.qgl-desk table.chain td.strike-col{text-align:center}
+
+/* In-the-money legs get a lift rather than a colour: colour on this table
+   already means sign, and a second meaning for the same channel makes both
+   unreadable. */
+.qgl-desk table.chain td.itm{background:#0c1f24;color:#c8d8dc}
+
+/* The at-the-money row is where the surface is anchored, so it is marked on
+   the row rather than left for the reader to find by comparing strikes to
+   the spot tile above. */
+.qgl-desk table.chain tr.atm td{background:#10262b;border-top:1px solid var(--teal);
+  border-bottom:1px solid var(--teal)}
+.qgl-desk table.chain tr.atm td.strike-col{background:#12333a;color:var(--teal)}
+
+/* -- funding sparkline ----------------------------------------------------
+   Distinct from `.sparkline`: this one is signed. Funding that flips sign is
+   the market changing which side pays, and a single-colour bar chart hides
+   the one event on the series worth seeing. */
+.qgl-desk .spark{height:110px;display:flex;align-items:flex-end;gap:2px;
+  padding:16px 14px 10px;border-bottom:1px solid #12272d}
+.qgl-desk .spark i{flex:1;min-height:2px;border-radius:1px;opacity:.85}
+.qgl-desk .spark i.pos{background:var(--teal)}
+.qgl-desk .spark i.neg{background:var(--red)}
+.qgl-desk .spark i:hover{opacity:1}
+
+/* -- wallet picker --------------------------------------------------------
+   The list is modelled on a venue's "Select your wallet" sheet: search at the
+   top, one row per wallet, icon + name + affordance. Styles live here rather
+   than in desk.css for the same reason the board's do — that sheet is
+   generated and hand edits are lost on the next regeneration. */
+.qgl-desk .wallet-search{width:100%;box-sizing:border-box;margin:10px 0 4px;
+  background:#0a171c;border:1px solid #1d343c;border-radius:8px;
+  color:#d7e2e4;padding:11px 13px;font-size:13px;outline:none}
+.qgl-desk .wallet-search::placeholder{color:#5c757c}
+.qgl-desk .wallet-search:focus{border-color:var(--teal)}
+
+/* Capped so a browser with eight wallets scrolls the list instead of pushing
+   the dialog's footer — and its Back button — off the bottom of the screen. */
+.qgl-desk .wallet-list{max-height:320px;overflow-y:auto;margin:0 -2px;padding:0 2px}
+.qgl-desk .wallet-list .empty{padding:18px 4px;font-size:12.5px}
+
+/* The row being attempted reads as busy without going flat: `:disabled` alone
+   dropped it to 55% opacity, which looks identical to the unavailable state
+   and told the user nothing about which wallet it was waiting on. */
+.qgl-desk .wallet-row.connecting{opacity:1;border-color:var(--teal);background:#102a2f;cursor:wait}
+.qgl-desk .wallet-row.connecting span{color:var(--teal)}
+
+/* Catalogue rows for wallets that are not installed. Anchors, not buttons:
+   they navigate to an install page, and a button that navigates is a button
+   that breaks middle-click, ctrl-click and "open in new tab". */
+.qgl-desk .wallet-row.absent{opacity:.62;text-decoration:none}
+.qgl-desk .wallet-row.absent:hover{opacity:1;border-color:#2c4a54;background:#0f2026}
+.qgl-desk .wallet-row.absent span{color:#5f7e86}
+.qgl-desk .wallet-glyph.dim{background:linear-gradient(135deg,#24414a,#2e4d58)}
+.qgl-desk .wallet-list .bracket-head{margin:14px 0 2px}

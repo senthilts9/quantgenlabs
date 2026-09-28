@@ -1,0 +1,50 @@
+# Builder stage: compile the pybind11 engines, then copy only the .so files
+# into the runtime image. Keeping g++/cmake out of the final layer keeps the
+# deployed image small and its attack surface narrow.
+FROM python:3.12-slim AS cppbuild
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      g++ make && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir pybind11
+WORKDIR /build
+COPY cpp ./cpp
+# Compiled directly rather than through cmake: two translation units with no
+# external dependencies do not need a build system, and this avoids pulling
+# cmake into the image just to invoke g++ twice.
+#
+# -O3 with PORTABLE flags only. -march=native would be faster here but bakes
+# in the build machine's instruction set, and the resulting binary can fault
+# with SIGILL on a different EC2 instance type. Portability beats a few
+# percent on a deployment that must not crash.
+RUN set -eux; \
+    PYINC="$(python -c 'import sysconfig;print(sysconfig.get_paths()["include"])')"; \
+    PBINC="$(python -m pybind11 --includes)"; \
+    EXT="$(python -c 'import sysconfig;print(sysconfig.get_config_var("EXT_SUFFIX"))')"; \
+    g++ -O3 -Wall -shared -std=c++20 -fPIC -pthread \
+        -Icpp/include $PBINC -I"$PYINC" \
+        cpp/src/quant_bindings.cpp -o "quant_engine_cpp${EXT}"; \
+    g++ -O3 -Wall -shared -std=c++20 -fPIC -pthread \
+        -Icpp/include $PBINC -I"$PYINC" \
+        cpp/src/crypto_bindings.cpp -o "qgl_xrpl_crypto${EXT}"; \
+    ls -la *.so
+
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PYTHONPATH=/app
+WORKDIR /app
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install -r requirements.txt
+COPY backend/app ./app
+# Vendored, standard-library-only trading package (see backend/cryptodesk/
+# VENDORED.md for provenance). Copied rather than pip-installed because the
+# upstream repo is private and a build-time token would persist in the layer
+# history. It adds nothing to requirements.txt.
+COPY backend/cryptodesk ./cryptodesk
+# The compiled extensions land on PYTHONPATH; app.core.engines imports them
+# defensively, so a failed build degrades to numpy rather than breaking boot.
+COPY --from=cppbuild /build/*.so ./
+RUN mkdir -p /app/data && useradd -m app && chown -R app /app
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD python -c "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health').status==200 else 1)"
+VOLUME ["/app/data"]
+CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000"]

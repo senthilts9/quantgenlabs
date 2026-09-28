@@ -1,0 +1,68 @@
+# Full stack: API + web + Prometheus + Grafana.
+#   cp .env.example .env   # optionally set ANTHROPIC_API_KEY
+#   docker compose up --build
+services:
+  api:
+    build: { context: ., dockerfile: deploy/Dockerfile.api }
+    env_file: .env
+    environment: { ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-haiku-4-5}" }
+    ports: ["8000:8000"]
+    restart: unless-stopped
+    volumes:
+      - oms-data:/app/data
+    networks:
+      default: {}
+      shared_web:
+        aliases: [qgl-api]
+  web:
+    build: { context: ., dockerfile: deploy/Dockerfile.web }
+    ports: ["5174:80"]
+    depends_on: [api]
+    restart: unless-stopped
+    networks:
+      default: {}
+      shared_web:
+        aliases: [qgl-web]
+  prometheus:
+    image: prom/prometheus:latest
+    volumes: ["./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:latest
+    depends_on: [prometheus]
+    # No hardcoded default -- GF_SECURITY_ADMIN_PASSWORD must come from .env
+    # (Grafana's own default is also "admin", so an unset env var here would
+    # silently fall back to an equally weak credential; failing loud is safer).
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "https://grafana.quantgenlabs.com"
+      # Anonymous access is VIEWER only: dashboards are readable without a
+      # login, but nothing can be edited, created or deleted anonymously.
+      # The admin account keeps its password -- this opens reading, not
+      # administration, which is the right trade for a public portfolio piece.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
+      # Hides the "sign in" prompt for anonymous visitors; admin can still
+      # reach /login directly.
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    restart: unless-stopped
+    networks:
+      default: {}
+      shared_web:
+        aliases: [qgl-grafana]
+
+volumes:
+  oms-data:
+
+networks:
+  default: {}
+  shared_web:
+    external: true

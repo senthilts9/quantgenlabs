@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cryptodesk — order ticket</title>
+<style>
+  :root {
+    --bg:#fbfbfa; --panel:#fff; --ink:#1a1a18; --muted:#6b6b66; --line:#e4e4e0;
+    --accent:#2b5fd9; --ok:#0d7a4a; --bad:#c2341f; --warn:#9a6a00;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16161a; --panel:#1e1e23; --ink:#e8e8e4; --muted:#9a9a94;
+            --line:#2e2e35; --accent:#7aa2f7; --ok:#4ec9a0; --bad:#f07a6a;
+            --warn:#d7a45c; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line);
+           display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  h1 { font-size:15px; margin:0; font-weight:650; letter-spacing:-0.01em; }
+  .guard { font:12px/1.4 var(--mono); color:var(--ok); }
+  .guard.hot { color:var(--bad); font-weight:700; }
+  .tagline { color:var(--muted); font-size:12.5px; }
+  main { display:grid; grid-template-columns: 340px 1fr; gap:18px; padding:18px 20px;
+         align-items:start; max-width:1400px; }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:9px;
+          padding:15px 16px; margin-bottom:16px; }
+  .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:.075em;
+             color:var(--muted); margin:0 0 12px; font-weight:650; }
+  label { display:block; font-size:11.5px; color:var(--muted); margin:10px 0 4px; }
+  input, select { width:100%; padding:7px 9px; border:1px solid var(--line);
+                  border-radius:6px; background:var(--bg); color:var(--ink);
+                  font:13px var(--mono); }
+  input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .checks { display:flex; gap:14px; margin-top:12px; font-size:12.5px; }
+  .checks label { display:flex; gap:6px; align-items:center; margin:0; color:var(--ink); }
+  .checks input { width:auto; }
+  button { width:100%; margin-top:14px; padding:9px; border-radius:6px;
+           border:1px solid var(--accent); background:var(--accent); color:#fff;
+           font-size:13px; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  table { width:100%; border-collapse:collapse; font:12px var(--mono); }
+  td, th { padding:2px 4px; text-align:right; }
+  th { color:var(--muted); font-weight:500; font-size:10.5px; text-transform:uppercase; }
+  td.bid { color:var(--ok); } td.ask { color:var(--bad); }
+  .meta { font:11.5px var(--mono); color:var(--muted); margin-top:9px; }
+
+  /* the two levels of disclosure */
+  .retail { border-left:3px solid var(--muted); }
+  .retail .verdict { font-size:15px; font-weight:600; padding:14px 0 4px; }
+  .retail .verdict.ok { color:var(--ok); } .retail .verdict.no { color:var(--bad); }
+  .retail .hint { color:var(--muted); font-size:12px; }
+
+  .desk { border-left:3px solid var(--accent); }
+  .stage { margin:10px 0; }
+  .stage-name { font:10.5px var(--mono); text-transform:uppercase; color:var(--muted);
+                letter-spacing:.07em; }
+  .rej { border:1px solid var(--line); border-left:3px solid var(--bad);
+         border-radius:5px; padding:8px 10px; margin:6px 0; }
+  .rej code { font:11.5px var(--mono); color:var(--bad); font-weight:650; }
+  .rej .msg { font-size:12.5px; margin:3px 0; }
+  .rej .detail { font:11px var(--mono); color:var(--muted); word-break:break-all; }
+  .pass { color:var(--ok); font:12px var(--mono); padding:6px 0; }
+  .repair { border-left:3px solid var(--warn); padding:6px 10px; margin:6px 0;
+            font:11.5px var(--mono); color:var(--warn); }
+  .counts { font:11.5px var(--mono); color:var(--muted); margin-top:10px;
+            padding-top:9px; border-top:1px solid var(--line); }
+  .note { color:var(--muted); font-size:12px; margin-top:12px; padding-top:10px;
+          border-top:1px solid var(--line); }
+  pre { font:11.5px var(--mono); background:var(--bg); border:1px solid var(--line);
+        border-radius:6px; padding:9px; overflow-x:auto; margin:8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>cryptodesk</h1>
+  <span class="guard" id="guard">checking…</span>
+  <span class="tagline">Same pipeline, two levels of disclosure.</span>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Order ticket</h2>
+      <label>Venue</label>
+      <select id="venue"></select>
+      <label>Market</label>
+      <select id="market"></select>
+      <div class="row">
+        <div><label>Side</label>
+          <select id="side"><option>BUY</option><option>SELL</option></select></div>
+        <div><label>Type</label>
+          <select id="type"><option>LIMIT</option><option>MARKET</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Size</label><input id="size" value="0.01"></div>
+        <div><label>Price</label><input id="price" placeholder="—"></div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="post_only"> post-only</label>
+        <label><input type="checkbox" id="reduce_only"> reduce-only</label>
+      </div>
+      <button id="submit" class="ghost">Submit for real (paper / testnet)</button>
+      <div class="meta" id="submitNote">Validation runs as you type. Nothing is sent
+        until you press submit.</div>
+    </div>
+
+    <div class="card">
+      <h2>Order book</h2>
+      <table id="book"><thead><tr><th>size</th><th>bid</th><th>ask</th><th>size</th>
+        </tr></thead><tbody></tbody></table>
+      <div class="meta" id="bookMeta">—</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card retail">
+      <h2>What a retail app shows you</h2>
+      <div class="verdict" id="retailVerdict">—</div>
+      <div class="hint" id="retailHint">This is the whole of it. An exchange app
+        tells you it failed, not which of its rules you broke.</div>
+    </div>
+
+    <div class="card desk">
+      <h2>What the desk sees</h2>
+      <div id="deskBody"><span class="pass">…</span></div>
+      <div class="counts" id="counts"></div>
+      <div class="note">Identical order, identical engine. The rejection
+        <em>codes</em> are the point: an execution system branches on them —
+        <code>POST_ONLY_WOULD_CROSS</code> means reprice and retry,
+        <code>INSUFFICIENT_MARGIN</code> means stop and escalate. Free text
+        cannot be branched on.</div>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none">
+      <h2>Submission result</h2>
+      <pre id="result"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = async (path, body) => {
+  const opts = body ? {method:"POST", headers:{"Content-Type":"application/json"},
+                       body: JSON.stringify(body)} : {};
+  const r = await fetch(path, opts);
+  return r.json();
+};
+
+function ticket() {
+  return {
+    venue: $("venue").value, market: $("market").value,
+    side: $("side").value, type: $("type").value,
+    size: $("size").value, price: $("price").value,
+    post_only: $("post_only").checked, reduce_only: $("reduce_only").checked,
+  };
+}
+
+async function boot() {
+  const state = await api("/api/state");
+  const g = $("guard");
+  g.textContent = state.guard;
+  if (state.mainnet) g.classList.add("hot");
+  const tradable = state.venues.filter(v => v.trades && v.matching !== "mock");
+  $("venue").innerHTML = tradable.map(v =>
+    `<option value="${v.venue}">${v.venue} — ${v.matching} matching` +
+    `${v.signed ? ", signed orders" : ""}</option>`).join("");
+  await loadMarkets();
+}
+
+async function loadMarkets() {
+  const { markets, error } = await api("/api/markets?venue=" + $("venue").value);
+  if (error) { $("market").innerHTML = `<option>${error}</option>`; return; }
+  const preferred = markets.filter(m => /^(BTC|ETH)/.test(m.symbol));
+  const list = (preferred.length ? preferred : markets).slice(0, 200);
+  $("market").innerHTML = list.map(m =>
+    `<option value="${m.symbol}">${m.symbol}</option>`).join("");
+  await refresh();
+}
+
+async function loadBook() {
+  const b = await api(`/api/book?venue=${$("venue").value}&market=${$("market").value}`);
+  const body = $("book").querySelector("tbody");
+  if (b.error) { body.innerHTML = ""; $("bookMeta").textContent = b.error; return; }
+  const n = Math.max(b.bids.length, b.asks.length);
+  let html = "";
+  for (let i = 0; i < Math.min(n, 8); i++) {
+    const bid = b.bids[i], ask = b.asks[i];
+    html += `<tr><td>${bid?bid.size:""}</td><td class="bid">${bid?bid.price:""}</td>` +
+            `<td class="ask">${ask?ask.price:""}</td><td>${ask?ask.size:""}</td></tr>`;
+  }
+  body.innerHTML = html;
+  $("bookMeta").textContent =
+    `mark ${b.mark} · spread ${b.spread_bps ?? "—"} bps · source ${b.source}`;
+  if (!$("price").value && b.mid) {
+    const mid = parseFloat(b.mid);
+    $("price").placeholder = mid.toFixed(2);
+  }
+}
+
+function renderRejection(r) {
+  const detail = Object.entries(r.detail || {})
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([k, v]) => `${k}=${v}`).join("  ");
+  return `<div class="rej"><code>${r.code}</code>
+    <span class="stage-name"> ${r.stage}${r.retryable ? " · retryable" : ""}</span>
+    <div class="msg">${r.message}</div>
+    ${detail ? `<div class="detail">${detail}</div>` : ""}</div>`;
+}
+
+async function refresh() {
+  const res = await api("/api/validate", ticket());
+  if (res.error) {
+    $("retailVerdict").textContent = "—";
+    $("deskBody").innerHTML = `<div class="rej"><code>${res.type}</code>
+      <div class="msg">${res.error}</div></div>`;
+    return;
+  }
+
+  const v = $("retailVerdict");
+  v.textContent = res.retail.message;
+  v.className = "verdict " + (res.retail.accepted ? "ok" : "no");
+
+  const d = res.desk;
+  let html = "";
+  for (const c of d.repairs) html += `<div class="repair">auto-repaired: ${c}</div>`;
+  const all = [...d.validation.rejections, ...d.risk];
+  if (!all.length) {
+    html += `<div class="pass">passed every rule in ${d.stages_run.join(" → ")}</div>`;
+  } else {
+    html += all.map(renderRejection).join("");
+  }
+  for (const w of d.validation.warnings) html += `<div class="repair">${w}</div>`;
+  $("deskBody").innerHTML = html;
+  $("counts").textContent =
+    `${d.rules_evaluated} rules across ${d.stages_run.length} stages · ` +
+    `${all.length} fired`;
+}
+
+let timer;
+const debounce = () => { clearTimeout(timer); timer = setTimeout(refresh, 220); };
+
+["size","price"].forEach(id => $(id).addEventListener("input", debounce));
+["side","type","post_only","reduce_only"].forEach(id =>
+  $(id).addEventListener("change", refresh));
+$("market").addEventListener("change", () => { loadBook(); refresh(); });
+$("venue").addEventListener("change", loadMarkets);
+
+$("submit").addEventListener("click", async () => {
+  $("submit").disabled = true;
+  const res = await api("/api/submit", ticket());
+  $("resultCard").style.display = "block";
+  $("result").textContent = JSON.stringify(res, null, 2);
+  $("submit").disabled = false;
+  loadBook();
+});
+
+boot();
+setInterval(loadBook, 5000);
+loadBook();
+</script>
+</body>
+</html>

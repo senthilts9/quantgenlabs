@@ -1,0 +1,45 @@
+name: ci
+on:
+  push: { branches: [main, "feat/**"] }
+  pull_request: { branches: [main] }
+jobs:
+  cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build engines + run C++ tests (compile clean, cross-check, determinism)
+        run: |
+          set -e
+          for b in quant_bench parallel_bench lsm_bench; do
+            g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/$b.cpp -o /tmp/$b && /tmp/$b
+          done
+          g++ -std=c++20 -O3 -Wall -Wextra -Icpp/include cpp/src/crypto_sim.cpp -o /tmp/crypto_sim && /tmp/crypto_sim
+          g++ -std=c++20 -O2 -Wall -Wextra -pthread -Icpp/include -Icpp/tests cpp/tests/test_engines.cpp -o /tmp/cpptests && /tmp/cpptests
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy scipy fastapi pydantic prometheus-client pytest hypothesis
+      - name: Property tests (pytest + Hypothesis)
+        run: cd backend && PYTHONPATH=. pytest tests -q
+      - name: Offline property runner (no test deps)
+        run: python backend/tests/run_local.py
+      - name: Engine math verifiers
+        run: |
+          python backend/verify/verify_core.py
+          python backend/verify/verify_crypto.py
+          python backend/verify/verify_sor.py
+          python backend/run_sor.py
+      - name: Basis backtest (smoke, produces tearsheet)
+        run: python backend/run_backtest.py --days 180
+      - name: Syntax-check backend
+        run: python -m py_compile backend/app/main.py backend/app/core/engines.py backend/app/services/tick_loop.py
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: cd frontend && npm install && npm run build

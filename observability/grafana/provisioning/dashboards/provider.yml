@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: Meridian
+    orgId: 1
+    folder: Meridian
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 15
+    options:
+      path: /var/lib/grafana/dashboards

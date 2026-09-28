@@ -1,0 +1,15 @@
+numpy>=1.26
+scipy>=1.11
+pandas>=2.1
+matplotlib>=3.8
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+prometheus-client>=0.20
+anthropic>=0.39
+ccxt>=4.3            # optional: live multi-exchange order books for SOR
+# Wallet sign-in (EIP-4361). Recovery is delegated rather than hand-rolled:
+# keccak and secp256k1 are the primitives where a subtle bug is a silent
+# rejection, not a crash. Imported defensively - without it /auth fails
+# closed with a named error and the write path simply stays locked.
+eth-account>=0.13

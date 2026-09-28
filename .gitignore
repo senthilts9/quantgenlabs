@@ -1,0 +1,34 @@
+# Secrets — the deployed .env holds a live ANTHROPIC_API_KEY and the Grafana
+# admin password. This repo had no .gitignore at all, so a single `git init`
+# followed by `git add .` would have committed them.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data — the OMS SQLite book, its WAL, and Prometheus/Grafana volumes.
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Build artefacts
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.ruff_cache/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Hypothesis property-test database (machine-local falsifying examples)
+.hypothesis/
