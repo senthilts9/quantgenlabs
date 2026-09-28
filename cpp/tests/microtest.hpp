@@ -42,6 +42,16 @@ inline int run_all() {
 #define REQUIRE(cond) \
     do { if (!(cond)) microtest::fail(__FILE__, __LINE__, "REQUIRE(" #cond ")"); } while (0)
 
+// Like REQUIRE, but RETURNS from the test body on failure. Use it for any
+// assertion the rest of the test depends on structurally -- a container size
+// before indexing, an optional before dereferencing. Plain REQUIRE records the
+// failure and carries on, which for a size check means the next line performs an
+// out-of-bounds read and the whole binary dies with a segfault instead of a
+// readable failure. (That is not hypothetical: it happened while writing the FIX
+// venue tests.)
+#define REQUIRE_R(cond) \
+    do { if (!(cond)) { microtest::fail(__FILE__, __LINE__, "REQUIRE_R(" #cond ")"); return; } } while (0)
+
 #define CHECK_CLOSE(a, b, tol) \
     do { const double _d = std::fabs((a) - (b)); \
          if (_d > (tol)) microtest::fail(__FILE__, __LINE__, \
