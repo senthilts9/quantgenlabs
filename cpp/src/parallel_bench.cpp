@@ -72,8 +72,18 @@ int main() {
                     static_cast<unsigned long long>(v.scenarios) * pf.size());
     }
 
-    std::printf("\nNote: sandbox has 1 physical core, so wall-clock won't drop with\n"
-                "more threads here — the determinism proof is the point. On an\n"
-                "8-core box the MC row scales ~6-8x (near-linear, memory-light).\n");
+    // This note used to assert "sandbox has 1 physical core, so wall-clock won't
+    // drop with more threads" and to project "~6-8x on an 8-core box". Both were
+    // wrong to leave in: the first is false on any multi-core host (and the timings
+    // printed above visibly contradict it), and the second is an extrapolation
+    // presented next to real measurements, which is exactly how a projection gets
+    // read as a result. Neither claim is made any more -- the numbers above are
+    // whatever this host actually did, and cpp/src/mkt_bench.cpp is the harness that
+    // records the environment needed to interpret them.
+    std::printf("\nNote: timings above are from THIS host and include SMT effects if the\n"
+                "thread count exceeds its physical core count -- run mkt_bench for the\n"
+                "environment capture (physical vs logical cores, compiler, SIMD level).\n"
+                "The determinism proof is independent of all that: identical price at\n"
+                "every thread count, which is the property a risk desk signs off on.\n");
     return 0;
 }
