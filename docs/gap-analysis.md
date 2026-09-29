@@ -16,7 +16,7 @@ overstated some things.
 
 | § | Area | Before | Now | Notes |
 |---|---|---|---|---|
-| 1 | Event-driven architecture, DDD, clean layering | Partial | Partial | `api`/`core`/`services`/`obs` separation was already good. Still request/response, not event-sourced. |
+| 1 | Event-driven architecture, DDD, clean layering | Partial | **Good** | The order flow now PUBLISHES to the bus — `orders.lifecycle`, `trades.executed`, `market.normalized`, `risk.breaches` — and P&L is a genuine consumer rebuilt from that log rather than a second copy of desk state. Publishing is wrapped so a bus failure cannot fail a trade. |
 | 2 | Market-data platform | Partial | **Good** | Feed validation, gap/duplicate/reorder/stale/outlier detection and an L2 book added in C++. Corporate actions, symbology and calendars still absent. |
 | 3 | Kafka / streaming backbone | **Absent** | **Good** | Topic catalogue with justified partition keys, retention and schema versions; EventBus interface; KafkaBus (written, never run — no broker here); InProcessBus implementing the same semantics and fully tested (ordering, consumer groups, at-least-once, idempotency, DLQ, replay). WebSocket streaming to the UI. |
 | 4 | Databricks / Delta Lake / medallion | **Absent** | **Good** | Bronze/silver/gold on delta-rs — **real Delta tables, genuinely executed and tested**, no Spark/JVM/Databricks needed. Idempotent ingest, rejects kept with reasons, time travel. Databricks itself would add a cluster and Unity Catalog, not a different format. |
@@ -27,7 +27,7 @@ overstated some things.
 | 9 | OMS / EMS / SOR | **Good** | **Good** | Already strong: marginal-cost routing, ML fill probability, TCA. Unchanged by this work. |
 | 10 | Pricing engine | **Good** | **Good** | BSM, Black-76, binomial, MC, LSM American, GARCH, curves, PCA. Heston/SABR/local-vol absent. |
 | 11 | Risk engine | **Good** | **Good** | VaR/ES (historical, parametric, MC), EVT tails, stress, Greeks, limits. CVA/PFE absent. |
-| 12 | Real-time P&L | Partial | Partial | Position and realised P&L now derived from booked fills with correct increase/reduce/cross-zero accounting. No streaming attribution service. |
+| 12 | Real-time P&L | Partial | **Good** | A projection over the event stream: realised/unrealised separated, stale marks excluded and reported rather than silently valued, attribution whose components must sum to the observed change, reconciliation against the desk, and rebuild-from-log as the correctness check. |
 | 13 | **Crypto trading — must be retained** | **Good** | **Good** | `backend/cryptodesk` (12.9k LOC) and `frontend/src/cryptodesk` (9k LOC) **untouched**. Verified by `verify_crypto.py` still passing. |
 | 14 | Portfolio management | **Good** | **Good** | Markowitz, efficient frontier, risk parity, attribution, stress. |
 | 15 | Enterprise UI/UX | Partial | **Good** | Command palette (⌘K, fuzzy), light/dark theme on CSS tokens, virtualised sortable/filterable table with CSV export, Trading Desk with ladder + ticket + blotter + FIX monitor, and **WebSocket streaming with reconnect, gap detection and a data-freshness indicator**. Still missing: resizable panels, saved workspaces. |
@@ -43,9 +43,13 @@ overstated some things.
 
 |  | Before | After C++ core | Now |
 |---|---|---|---|
-| Good | 5 | 11 | 18 |
-| Partial | 9 | 8 | 4 |
+| Good | 5 | 11 | **20** |
+| Partial | 9 | 8 | **2** |
 | Absent | 7 | 5 | **0** |
+
+Still Partial: **§20 institutional features** (security master, reconciliation
+engine, EOD/SOD, model governance) and **§21 repository structure** (deliberately
+not restructured — see the note at the end).
 
 No section is entirely absent. Two carry an explicit caveat rather than a clean
 bill:

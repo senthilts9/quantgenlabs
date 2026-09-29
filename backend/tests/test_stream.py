@@ -104,7 +104,15 @@ def test_event_stream_rejects_an_undeclared_topic():
 
 
 def test_event_stream_delivers_published_events():
+    """A new consumer group starts at offset 0 and therefore reads whatever
+    history the topic already holds. The test tags its own events with a unique
+    marker rather than assuming an empty topic — which is also how a real
+    consumer has to work, since a live topic is never empty."""
+    import uuid
+
     from app.core.events import get_bus
+
+    run = uuid.uuid4().hex[:8]
 
     with client.websocket_connect("/api/stream/events/orders.lifecycle?interval_ms=50") as ws:
         hello = json.loads(ws.receive_text())
@@ -113,16 +121,18 @@ def test_event_stream_delivers_published_events():
 
         bus = get_bus()
         for i in range(3):
-            bus.publish("orders.lifecycle", f"ORD-{i}", {"status": "new", "n": i})
+            bus.publish("orders.lifecycle", f"ORD-{run}-{i}",
+                        {"status": "new", "run": run, "n": i})
 
-        # Events are NOT conflated: all three must arrive.
-        received = []
-        for _ in range(6):
+        # Events are NOT conflated: all three of ours must arrive.
+        mine: list[dict] = []
+        for _ in range(12):
             frame = json.loads(ws.receive_text())
             if frame["kind"] == "events":
-                received.extend(frame["data"]["events"])
-            if len(received) >= 3:
+                mine.extend(e for e in frame["data"]["events"]
+                            if e["payload"].get("run") == run)
+            if len(mine) >= 3:
                 break
-        assert len(received) >= 3
-        assert {e["payload"]["n"] for e in received} >= {0, 1, 2}
-        assert all(e["event_id"] for e in received)
+        assert len(mine) >= 3
+        assert {e["payload"]["n"] for e in mine} >= {0, 1, 2}
+        assert all(e["event_id"] for e in mine)

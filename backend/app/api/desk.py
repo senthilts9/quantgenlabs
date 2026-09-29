@@ -29,6 +29,8 @@ from pydantic import BaseModel, Field
 
 from ..core import connectivity as conn
 from ..core.auth import Permission, require
+from ..core.events import publishers
+from ..core.pnl import PnLProjection
 from ..obs import tracing
 
 router = APIRouter(prefix="/api/desk", tags=["trading desk"])
@@ -42,10 +44,20 @@ NS = 1_000_000_000
 @dataclass
 class DeskSession:
     desk: object
-    lock: threading.Lock = field(default_factory=threading.Lock)
+    # RLock, not Lock. The publish helper needs desk state and is called from
+    # inside the critical section that produced it; with a non-reentrant Lock
+    # that self-deadlocks the request thread and the endpoint hangs forever
+    # rather than failing. Re-entrancy is the honest fix here because the lock
+    # guards one thread's access to non-thread-safe C++ objects, not a resource
+    # being contended between the nested calls.
+    lock: threading.RLock = field(default_factory=threading.RLock)
     created: float = field(default_factory=time.time)
     last_used: float = field(default_factory=time.time)
     seq: int = 0                      # ClOrdID counter for this desk
+    # Fed from the same events this desk publishes, so the projection is a
+    # genuine consumer rather than a second copy of the desk's own state.
+    pnl: PnLProjection = field(default_factory=PnLProjection)
+    published_fills: set = field(default_factory=set)
 
 
 _desks: dict[str, DeskSession] = {}
@@ -98,6 +110,69 @@ def _book_snapshot(desk, levels: int = 8) -> dict:
     }
 
 
+def _publish_order_events(s: DeskSession, desk_id: str, cl_ord_id: str,
+                          symbol: str) -> None:
+    """Emit the facts this order produced, and feed the P&L projection.
+
+    Wrapped so a bus failure cannot reach the order path: the trade already
+    happened, and failing it because the event log was unreachable would be
+    strictly worse than losing the event.
+    """
+    try:
+        with s.lock:
+            row = next((r for r in s.desk.blotter() if r["cl_ord_id"] == cl_ord_id), None)
+            if row is None:
+                return
+            fills = list(row["fills"])
+            sym = row["symbol"] or symbol
+            side = row["side"]
+            status, cum, leaves, avg = (row["status"], row["cum_qty"],
+                                        row["leaves_qty"], row["avg_px"])
+            reject = row.get("reject_text", "")
+
+        publishers.order_state_changed(
+            cl_ord_id=cl_ord_id, symbol=sym, status=status, cum_qty=cum,
+            leaves_qty=leaves, avg_px=avg, reject_text=reject, desk_id=desk_id)
+
+        for f in fills:
+            exec_id = f.get("exec_id") or f"{cl_ord_id}-{f['qty']}-{f['price']}"
+            # Only publish a fill once even though this runs after every action
+            # on the order: the blotter carries the full fill history each time.
+            if exec_id in s.published_fills:
+                continue
+            s.published_fills.add(exec_id)
+            fix_side = "buy" if side == "1" else "sell"
+            publishers.trade_executed(
+                cl_ord_id=cl_ord_id, exec_id=exec_id, symbol=sym,
+                side=fix_side, qty=f["qty"], price=f["price"], desk_id=desk_id)
+            s.pnl.apply_fill(symbol=sym, side=fix_side, qty=f["qty"],
+                             price=f["price"], exec_id=exec_id)
+
+        if status == "rejected" and reject:
+            publishers.risk_breached(symbol=sym, decision=reject, side=side,
+                                     qty=cum + leaves, price=avg)
+
+        # Mark from the venue's top of book so unrealised has something fresh.
+        #
+        # The mark is PUBLISHED before it is applied, not just applied. Feeding
+        # the projection something that is not in the log breaks the property the
+        # projection is built on -- that it can be rebuilt from the log and get
+        # the same answer. The rebuild check caught exactly this: marks applied
+        # directly made a rebuild disagree by the whole unrealised P&L.
+        with s.lock:
+            import mkt_connectivity as mc
+            b = s.desk.book()
+            ts = s.desk.tick_size()
+            bid, ask = b.best(mc.Side.BID), b.best(mc.Side.ASK)
+        if bid and ask:
+            mid = ((bid[0] + ask[0]) / 2.0) * ts
+            publishers.market_tick(symbol=sym, seq=0, price=mid, size=0.0,
+                                   verdict="accepted")
+            s.pnl.apply_mark(sym, mid)
+    except Exception:            # noqa: BLE001 - must never break the order path
+        pass
+
+
 def _state(desk_id: str, s: DeskSession, wire_tail: int = 40) -> dict:
     d = s.desk
     return {
@@ -108,6 +183,7 @@ def _state(desk_id: str, s: DeskSession, wire_tail: int = 40) -> dict:
         "blotter": list(d.blotter()),
         "position": dict(d.position()),
         "venue_stats": dict(d.engine_stats()),
+        "pnl": s.pnl.totals(),
         "wire_log": list(d.wire_log(wire_tail)),
         "simulated": True,
         "note": "Simulated venue. No real exchange, no money.",
@@ -207,6 +283,11 @@ def submit_order(desk_id: str, req: OrderRequest) -> dict:
         }):
             s.desk.submit(cl, req.symbol, req.side, req.qty, req.price,
                           req.ord_type, req.tif, _now_ns(s))
+
+        # Events are published AFTER the state change is committed. Publishing
+        # "filled" before the fill is recorded is a lie the rest of the system
+        # would act on, and the window is long enough to matter.
+        _publish_order_events(s, desk_id, cl, req.symbol)
         st = _state(desk_id, s)
         # The messages THIS order produced, so the UI can show the exchange that
         # just happened rather than the whole session history.
@@ -231,6 +312,7 @@ def cancel_order(desk_id: str, req: CancelRequest) -> dict:
         s.seq += 1
         before = len(s.desk.wire_log(0))
         s.desk.cancel(f"{req.orig_cl_ord_id}-C{s.seq}", req.orig_cl_ord_id, _now_ns(s))
+        _publish_order_events(s, desk_id, req.orig_cl_ord_id, "")
         st = _state(desk_id, s)
         st["this_order"] = {
             "cl_ord_id": req.orig_cl_ord_id,
