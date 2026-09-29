@@ -13,3 +13,13 @@ ccxt>=4.3            # optional: live multi-exchange order books for SOR
 # rejection, not a crash. Imported defensively - without it /auth fails
 # closed with a named error and the write path simply stays locked.
 eth-account>=0.13
+
+# Relational store (OPT-IN: only used when QGL_DATABASE_URL is set; the default
+# path is still the SQLite OMS store, and the crypto desk stays on SQLite).
+sqlalchemy>=2.0
+alembic>=1.13
+psycopg[binary]>=3.1
+# Embedded PostgreSQL binaries as a wheel -- lets the repository and migration
+# tests run against a REAL Postgres with no Docker and no system install. Test
+# dependency only; nothing imports it at runtime.
+pgserver>=0.1.4
