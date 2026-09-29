@@ -40,7 +40,7 @@ endif()
 enable_testing()
 foreach(t engine_tests:test_engines book_tests:test_book feed_tests:test_feed
          fix_tests:test_fix fix_session_tests:test_fix_session
-         pretrade_tests:test_pretrade matching_tests:test_matching fix_venue_tests:test_fix_venue desk_tests:test_desk lat_tests:test_lat)
+         pretrade_tests:test_pretrade matching_tests:test_matching fix_venue_tests:test_fix_venue desk_tests:test_desk lat_tests:test_lat hft_tests:test_hft)
   string(REPLACE ":" ";" _pair ${t})
   list(GET _pair 0 _target)
   list(GET _pair 1 _src)

@@ -31,7 +31,7 @@ jobs:
           g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/mkt_bench.cpp -o /tmp/mkt_bench
           /tmp/mkt_bench 200000 1 > /tmp/bench.json
           python3 -c "import json;d=json.load(open('/tmp/bench.json'));assert d['schema_version']==1;assert d['monte_carlo']['timesteps_per_path']==1;print('bench JSON valid')"
-          for t in test_engines test_book test_feed test_fix test_fix_session test_pretrade test_matching test_fix_venue test_desk test_lat; do
+          for t in test_engines test_book test_feed test_fix test_fix_session test_pretrade test_matching test_fix_venue test_desk test_lat test_hft; do
             g++ -std=c++20 -O2 -Wall -Wextra -pthread -Icpp/include -Icpp/tests cpp/tests/$t.cpp -o /tmp/$t && /tmp/$t
           done
   python:
