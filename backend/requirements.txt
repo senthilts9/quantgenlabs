@@ -34,3 +34,15 @@ pyjwt>=2.8
 opentelemetry-sdk>=1.24
 opentelemetry-instrumentation-fastapi>=0.45b0
 opentelemetry-exporter-otlp-proto-http>=1.24
+
+# Event backbone. QGL_KAFKA_BROKERS selects Kafka; unset, an in-process bus with
+# the same semantics (partitioning, ordering, consumer groups, at-least-once,
+# idempotency, DLQ, replay) runs instead. The Kafka path is written but has NEVER
+# been run against a broker -- none exists in the dev environment.
+kafka-python-ng>=2.2
+
+# Lakehouse. delta-rs is a Rust implementation of the Delta protocol: real Delta
+# tables, no Spark, no JVM, no Databricks workspace. The medallion pipeline is
+# genuinely executed and tested against it.
+deltalake>=1.0
+pyarrow>=15.0
