@@ -27,6 +27,7 @@
 #include "mkt/feed/validator.hpp"
 #include "mkt/fix/message.hpp"
 #include "mkt/risk/pretrade.hpp"
+#include "mkt/venue/desk.hpp"
 #include "mkt/venue/matching_engine.hpp"
 
 namespace py = pybind11;
@@ -318,4 +319,94 @@ PYBIND11_MODULE(mkt_connectivity, m) {
             d["self_match_blocks"] = s.self_match_blocks; d["volume"] = s.volume;
             return d;
         });
+
+    // ---------------------------------------------------------------- desk
+    // The client side: a FIX session wired to the simulated venue, keeping a
+    // blotter built ONLY from the ExecutionReports that came back.
+    //
+    // Python asks for "a limit buy of 500" and receives blotter rows and a wire
+    // log. It never assembles FIX itself -- the session layer owns sequence
+    // numbers, BodyLength and CheckSum, and a caller able to build arbitrary FIX
+    // could produce a message the session never sequenced.
+    py::class_<mkt::venue::SimulatedDesk>(m, "SimulatedDesk")
+        .def(py::init<mkt::book::Ticks, std::size_t, double, std::string, std::string>(),
+             py::arg("floor_ticks") = 1, py::arg("n_ticks") = 50000,
+             py::arg("tick_size") = 0.01, py::arg("sender") = "QGLABS",
+             py::arg("target") = "SIMVENUE")
+        .def("start", &mkt::venue::SimulatedDesk::start, py::arg("now_ns"))
+        .def("connected", &mkt::venue::SimulatedDesk::connected)
+        .def("seed_liquidity", &mkt::venue::SimulatedDesk::seed_liquidity,
+             py::arg("side"), py::arg("price"), py::arg("qty"))
+        .def("submit", &mkt::venue::SimulatedDesk::submit,
+             py::arg("cl_ord_id"), py::arg("symbol"), py::arg("side"), py::arg("qty"),
+             py::arg("price"), py::arg("ord_type"), py::arg("tif"), py::arg("now_ns"))
+        .def("cancel", &mkt::venue::SimulatedDesk::cancel,
+             py::arg("cl_ord_id"), py::arg("orig_cl_ord_id"), py::arg("now_ns"))
+        .def("tick", &mkt::venue::SimulatedDesk::tick, py::arg("now_ns"))
+        .def("tick_size", &mkt::venue::SimulatedDesk::tick_size)
+        .def("book", [](const mkt::venue::SimulatedDesk& d) {
+            return &d.engine().book();
+        }, py::return_value_policy::reference_internal)
+        .def("engine_stats", [](const mkt::venue::SimulatedDesk& d) {
+            const auto& s = d.engine().stats();
+            py::dict o;
+            o["orders_accepted"] = s.orders_accepted; o["orders_rejected"] = s.orders_rejected;
+            o["fills"] = s.fills; o["cancels"] = s.cancels;
+            o["self_match_blocks"] = s.self_match_blocks; o["volume"] = s.volume;
+            return o;
+        })
+        .def("position", [](const mkt::venue::SimulatedDesk& d) {
+            double net = 0, avg = 0;
+            d.position(net, avg);
+            py::dict o; o["net_qty"] = net; o["avg_cost"] = avg;
+            return o;
+        })
+        .def("blotter", [](const mkt::venue::SimulatedDesk& d) {
+            py::list rows;
+            for (const auto& r : d.blotter()) {
+                py::dict o;
+                o["cl_ord_id"] = r.cl_ord_id;
+                o["orig_cl_ord_id"] = r.orig_cl_ord_id;
+                o["venue_order_id"] = r.venue_order_id;
+                o["symbol"] = r.symbol;
+                o["side"] = r.side;
+                o["ord_type"] = r.ord_type;
+                o["tif"] = r.tif;
+                o["order_qty"] = r.order_qty;
+                o["limit_price"] = r.limit_price;
+                o["status"] = r.status;
+                o["cum_qty"] = r.cum_qty;
+                o["leaves_qty"] = r.leaves_qty;
+                o["avg_px"] = r.avg_px;
+                o["reject_text"] = r.reject_text;
+                py::list fills;
+                for (const auto& f : r.fills) {
+                    py::dict fd;
+                    fd["exec_id"] = f.exec_id; fd["qty"] = f.qty; fd["price"] = f.price;
+                    fd["exec_type"] = f.exec_type; fd["ord_status"] = f.ord_status;
+                    fills.append(fd);
+                }
+                o["fills"] = fills;
+                rows.append(o);
+            }
+            return rows;
+        })
+        // Raw bytes come back with SOH rendered as '|': a FIX message containing
+        // a 0x01 control character is not safely transportable through JSON.
+        .def("wire_log", [](const mkt::venue::SimulatedDesk& d, std::size_t tail) {
+            py::list out;
+            const auto& w = d.wire_log();
+            const std::size_t start = (tail && w.size() > tail) ? w.size() - tail : 0;
+            for (std::size_t i = start; i < w.size(); ++i) {
+                py::dict o;
+                std::string pretty = w[i].raw;
+                for (char& c : pretty) if (c == mkt::fix::SOH) c = '|';
+                o["outbound"] = w[i].outbound;
+                o["raw"] = pretty;
+                o["msg_type"] = w[i].msg_type;
+                o["seq"] = w[i].seq;
+                out.append(o);
+            }
+            return out;
+        }, py::arg("tail") = 0);
 }

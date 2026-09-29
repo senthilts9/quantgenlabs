@@ -20,6 +20,7 @@ import { T, MONO } from "./theme.js";
 // already 4k lines; they share the palette via theme.js rather than a copy.
 import PerformanceLab from "./screens/PerformanceLab.jsx";
 import ConnectivityScreen from "./screens/Connectivity.jsx";
+import TradingDesk from "./screens/TradingDesk.jsx";
 
 /* ================================================================== *
  *  QuantGenLabs — Risk & Quant Console (full shell)
@@ -134,6 +135,7 @@ const NAV = [
   // because these are engineering screens -- they describe the platform itself
   // rather than a market.
   { group: "MARKET CONNECTIVITY", items: [
+    { id: "desk", label: "Trading Desk", icon: Router },
     { id: "connectivity", label: "Connectivity & FIX", icon: Split },
     { id: "perflab", label: "Performance Lab", icon: Cpu }] },
   { group: "ANALYTICS", items: [
@@ -150,7 +152,7 @@ const NAV = [
 // NAV entry without a branch surfaces immediately.
 const HANDLED = new Set(["overview", "sor", "blotter", "limits", "market", "rates",
   "backtest", "sensitivity", "stress", "optim", "genai", "models", "market-risk", "quanthub",
-  "pricing", "obs", "copilot", "connectivity", "perflab",
+  "pricing", "obs", "copilot", "connectivity", "perflab", "desk",
   ...(CRYPTO_DESK_ENABLED ? ["cryptodesk"] : [])]);
 
 export default function Console() {
@@ -245,6 +247,7 @@ export default function Console() {
           {CRYPTO_DESK_ENABLED && view === "cryptodesk" && (
             <div className="qgl-desk"><DigitalAssetsDesk /></div>
           )}
+          {view === "desk" && <TradingDesk />}
           {view === "connectivity" && <ConnectivityScreen />}
           {view === "perflab" && <PerformanceLab />}
           {view === "obs" && <Observability />}
