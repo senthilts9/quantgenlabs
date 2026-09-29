@@ -177,36 +177,74 @@ which looks like noise. `cpp/src/lat_bench.cpp` measures the distribution:
 ./benchmarks/run.sh          # runs it; writes benchmarks/results-latency.json
 ```
 
-### The measurement floor comes first
+### The measurement floor comes first — and it was moved
 
-Reading the monotonic clock on this host costs **p50 43ns, p99 59ns**. That is the
-same order as the operations being timed, so the harness measures it first and
-flags any result whose p50 sits within 25% of it as `at_timer_floor: true`.
+Reading `clock_gettime` on this host costs **p50 55ns**. That is *more* than
+several of the operations being measured, so three of twelve results sat at that
+floor and were flagged `at_timer_floor: true` and not quoted.
 
-Three of the twelve measurements are flagged. **They are not measurements of the
-code — they are measurements of the timer**, and they are reported that way rather
-than quoted as sub-50ns achievements.
+Flagging a measurement you cannot make is honest but it is not a measurement. The
+harness now times with **RDTSC** — `LFENCE`+`RDTSC` to open a region, `RDTSCP` to
+close it — which costs **p50 13ns**, a 4× lower floor.
 
-### Measured, 300,000 iterations, nanoseconds per operation
+Four things make that correct, and getting any wrong produces numbers that look
+fine and are not:
 
-| Operation | p50 | p99 | p99.9 | p99/p50 | |
-|---|---|---|---|---|---|
-| `book.top_of_book` | 46 | 65 | 68 | 1.4× | **at timer floor** |
-| `book.depth_10` | 49 | 70 | 75 | 1.4× | **at timer floor** |
-| `risk.pretrade_check` | 53 | 55 | 70 | 1.0× | **at timer floor** |
-| `book.upsert` | 72 | 114 | 143 | 1.6× | |
-| `feed.validate` | 87 | 91 | 110 | 1.1× | |
-| `fix.encode_nos` | 184 | 208 | 285 | 1.1× | |
-| **`tick_to_order`** | **209** | **240** | **329** | **1.1×** | full path |
-| `fix.parse_trusted` | 344 | 363 | 608 | 1.1× | |
-| `fix.parse_validated` | 379 | 393 | 682 | 1.0× | |
+1. **Invariant TSC is checked**, via `CPUID.80000007:EDX[8]`. Without it the
+   counter varies with frequency scaling and stops in deep C-states, so it is not
+   a clock. The harness falls back to `steady_clock` and says so.
+2. **Fencing differs at each end.** Plain `RDTSC` can be reordered by the
+   out-of-order engine. `LFENCE` before it at the start stops later work moving
+   above; `RDTSCP` at the end waits for prior instructions to retire. Using bare
+   `RDTSC` for both is the classic error.
+3. **Calibrated against the monotonic clock at startup**, not read from a nominal
+   frequency — the nominal figure is the base clock and the CPU is rarely at it.
+   Measured **2.3040 GHz**, which independently matches this CPU's reported
+   `machdep.tsc.frequency` of 2,304,000,000.
+4. **Not comparable across cores** unless the TSC is synchronised, which is why
+   cross-core measurements also place the threads.
 
-`tick_to_order` is validate → book update → top-of-book read → pre-trade risk →
-encode `NewOrderSingle`. **209ns p50, 329ns p99.9.** No network, no kernel, no
-venue — those dominate real wire-to-wire latency and are not being claimed here.
+**Result: 0 of 12 measurements are now at the floor.**
 
-**Read `p99/p50` first.** Every in-process path is between 1.0× and 1.6×, which
-says the median is describing the system rather than hiding a tail behind it.
+### These numbers are a CORRECTION to what was published before
+
+The three previously-unquotable operations were being measured by an instrument
+more expensive than they are, which inflated them roughly 2×:
+
+| Operation | Published (clock_gettime) | Measured (TSC) |
+|---|---|---|
+| `book.top_of_book` | 46ns — *at floor, not quotable* | **26ns** |
+| `book.depth_10` | 49ns — *at floor, not quotable* | **26ns** |
+| `risk.pretrade_check` | 53ns — *at floor, not quotable* | **29ns** |
+| SPSC handoff p50 | 125ns | **89ns** |
+| `tick_to_order` p50 | 209ns | **191ns** |
+
+### Measured with RDTSC, 300,000 iterations, nanoseconds per operation
+
+| Operation | p50 | p99 | p99.9 | p99/p50 |
+|---|---|---|---|---|
+| `book.top_of_book` | 26 | 31 | 33 | 1.2× |
+| `book.depth_10` | 26 | 33 | 38 | 1.3× |
+| `risk.pretrade_check` | 29 | 37 | 40 | 1.3× |
+| `book.upsert` | 65 | 101 | 124 | 1.6× |
+| `feed.validate` | 75 | 84 | 131 | 1.1× |
+| `fix.encode_nos` | 167 | 287 | 319 | 1.7× |
+| **`tick_to_order`** | **191** | **309** | **430** | **1.6×** |
+| `fix.parse_trusted` | 348 | 722 | 862 | 2.1× |
+| `fix.parse_validated` | 383 | 821 | 983 | 2.1× |
+
+### CPU placement is reported, not assumed
+
+The harness now reports what the OS actually granted, because "pinned" means
+different things and reporting a hint as a guarantee is worse than not pinning:
+
+- **Linux**: `pthread_setaffinity_np` is a hard constraint → reported `Pinned`.
+- **macOS** (this host): `THREAD_AFFINITY_POLICY` is an affinity *tag*, not a
+  pin — it asks the scheduler to co-locate tagged threads on one L2 and may be
+  ignored. Reported **`hint only (kernel may ignore)`**.
+
+So the tails above still include migrations a Linux box with `isolcpus` would not
+have. Single NUMA node here, so remote-memory cost does not arise.
 
 ### Cross-thread handoff — why a mutex is the wrong primitive
 
@@ -214,19 +252,24 @@ One message across an **empty** queue, producer paced so nothing queues:
 
 | Mechanism | p50 | p99 | p99.9 |
 |---|---|---|---|
-| Lock-free SPSC ring | **125 ns** | 158 ns | **172 ns** |
-| Same ring, indices sharing one cache line | 144 ns | 158 ns | 165 ns |
-| `std::queue` + mutex + condvar | 4,953 ns | 10,096 ns | **113,504 ns** |
+| Lock-free SPSC ring | **89 ns** | 166 ns | **204 ns** |
+| Same ring, indices sharing one cache line | 83 ns | 159 ns | 200 ns |
+| `std::queue` + mutex + condvar | 4,916 ns | 9,899 ns | **74,532 ns** |
 
 The p50 gap is 40×. **The p99.9 gap is 660×** — and that is the real argument. A
 mutex is not merely slower on average: its tail is unbounded, because the wake-up
 is a syscall and a producer descheduled while holding the lock stops the consumer
 for a whole scheduling quantum. That is the p99.9 nobody can explain afterwards.
 
-False sharing costs ~15% at p50 here. That is smaller than it would be on a bigger
-machine — this host has 2 physical cores sharing one L3, so the line ping-pong is
-cheap. Reported as measured rather than as the dramatic number it becomes across
-sockets.
+**False sharing is not resolvable on this hardware.** With the timer overhead
+removed, the separated and false-shared rings measure 89ns and 83ns — the
+"correct" one is nominally *slower*, which is run-to-run noise rather than a
+result. This host has 2 physical cores sharing one L3, so the cache line never
+leaves it and the ping-pong that makes false sharing expensive across sockets
+simply does not happen. The earlier "~15%" figure was within that same noise and
+should not have been quoted as a finding. The cache-line separation is still
+correct — it is what makes the structure behave on a machine where it matters —
+but this host cannot demonstrate its value.
 
 ### A measurement bug worth recording
 

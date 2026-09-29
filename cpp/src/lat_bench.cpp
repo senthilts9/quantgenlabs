@@ -22,6 +22,8 @@
 // and the p99.9 here is dominated by the SCHEDULER, not by the code under test.
 // The honest reading is: the p50 tells you about the code, the tail tells you
 // about this host.
+#include "mkt/hft/affinity.hpp"
+#include "mkt/hft/tsc.hpp"
 #include "mkt/lat/histogram.hpp"
 #include "mkt/lat/spsc_ring.hpp"
 #include "mkt/book/ladder.hpp"
@@ -53,6 +55,10 @@ static std::vector<lat::Named> results;
 // entirely, and then it measures an empty loop.
 double g_sink = 0;
 
+// Timed with RDTSC where available. clock_gettime costs ~43ns on this host,
+// which is MORE than several of the operations being measured -- three of the
+// twelve results previously sat at that floor and could not be quoted. RDTSC
+// with proper fencing costs ~13ns, which is what makes them measurable at all.
 template <class Setup, class Op>
 static void measure(const char* name, std::size_t iters, Setup setup, Op op,
                     const char* note = "") {
@@ -61,13 +67,38 @@ static void measure(const char* name, std::size_t iters, Setup setup, Op op,
     // Untimed warm-up: the first iterations pay cold caches, page faults and an
     // untrained branch predictor. Including them measures start-up.
     for (std::size_t i = 0; i < iters / 20 + 1000; ++i) op(i);
-    for (std::size_t i = 0; i < iters; ++i) {
-        const auto t0 = now_ns();
-        op(i);
-        const auto t1 = now_ns();
-        h.record(t1 - t0);
+
+    const auto& clk = mkt::hft::TscClock::instance();
+    if (clk.usable()) {
+        for (std::size_t i = 0; i < iters; ++i) {
+            const std::uint64_t c0 = mkt::hft::tsc_begin();
+            op(i);
+            const std::uint64_t c1 = mkt::hft::tsc_end();
+            h.record(static_cast<std::uint64_t>(clk.to_ns(c1 - c0)));
+        }
+    } else {
+        for (std::size_t i = 0; i < iters; ++i) {
+            const auto t0 = now_ns();
+            op(i);
+            const auto t1 = now_ns();
+            h.record(t1 - t0);
+        }
     }
     results.push_back({name, h.compute(), note});
+}
+
+// The TSC's own cost, measured the same way the operations are.
+static Stats tsc_overhead(std::size_t n = 200000) {
+    Histogram h(n);
+    const auto& clk = mkt::hft::TscClock::instance();
+    for (std::size_t i = 0; i < 2000; ++i) { (void)mkt::hft::tsc_begin(); }
+    for (std::size_t i = 0; i < n; ++i) {
+        const std::uint64_t a = mkt::hft::tsc_begin();
+        const std::uint64_t b = mkt::hft::tsc_end();
+        h.record(static_cast<std::uint64_t>(clk.to_ns(b - a)));
+    }
+    h.drop_warmup(n / 100);
+    return h.compute();
 }
 
 int main(int argc, char** argv) {
@@ -75,6 +106,12 @@ int main(int argc, char** argv) {
 
     // ------------------------------------------------- measurement floor
     const Stats clk = lat::clock_overhead(100000);
+    const auto& tscclk = mkt::hft::TscClock::instance();
+    const Stats tsc = tscclk.usable() ? tsc_overhead(100000) : clk;
+    // Whichever timer is actually in use sets the floor results are judged against.
+    const Stats floor = tscclk.usable() ? tsc : clk;
+    const auto topo = mkt::hft::topology();
+    const auto pin = mkt::hft::pin_current_thread(0);
 
     // ------------------------------------------------- order book
     {
@@ -313,9 +350,22 @@ int main(int argc, char** argv) {
     std::printf("{\n  \"schema_version\": 1,\n  \"kind\": \"latency_distribution\",\n");
     std::printf("  \"units\": \"nanoseconds per operation\",\n");
     std::printf("  \"iterations\": %zu,\n", iters);
-    std::printf("  \"clock_overhead_ns\": {\"p50\": %.0f, \"p99\": %.0f, \"mean\": %.1f},\n",
-                clk.p50, clk.p99, clk.mean);
-    std::printf("  \"clock_overhead_note\": \"Cost of reading the monotonic clock, measured not assumed. Any figure at or below this floor is NOT a measurement of the code under test -- it is the timer.\",\n");
+    std::printf("  \"timer\": {\n");
+    std::printf("    \"source\": %s,\n", esc(tscclk.source()).c_str());
+    std::printf("    \"tsc_usable\": %s,\n", tscclk.usable() ? "true" : "false");
+    std::printf("    \"calibrated_ghz\": %.4f,\n", tscclk.ghz());
+    std::printf("    \"clock_gettime_overhead_ns\": {\"p50\": %.0f, \"p99\": %.0f},\n", clk.p50, clk.p99);
+    std::printf("    \"tsc_overhead_ns\": {\"p50\": %.0f, \"p99\": %.0f},\n", tsc.p50, tsc.p99);
+    std::printf("    \"floor_ns\": %.0f,\n", floor.p50);
+    std::printf("    \"note\": \"RDTSC (LFENCE+RDTSC to open, RDTSCP to close) replaces clock_gettime because the latter costs more than several of the operations being measured. Any figure at or below floor_ns is NOT a measurement of the code -- it is the timer.\"\n");
+    std::printf("  },\n");
+    std::printf("  \"cpu_placement\": {\n");
+    std::printf("    \"logical_cpus\": %u, \"physical_cores\": %u, \"numa_nodes\": %u,\n",
+                topo.logical_cpus, topo.physical_cores, topo.numa_nodes);
+    std::printf("    \"hard_pinning_available\": %s,\n", topo.hard_pinning ? "true" : "false");
+    std::printf("    \"pin_result\": %s,\n", esc(mkt::hft::to_string(pin)).c_str());
+    std::printf("    \"note\": %s\n", esc(topo.affinity_note).c_str());
+    std::printf("  },\n");
     std::printf("  \"measurements\": [\n");
     for (std::size_t i = 0; i < results.size(); ++i) {
         const auto& r = results[i];
@@ -323,7 +373,7 @@ int main(int argc, char** argv) {
         // Flag it here rather than leaving a reader to compare against the
         // floor themselves. An operation whose p50 sits within 25% of the
         // timer's own cost is not being measured -- the timer is.
-        const bool at_floor = s.p50 <= clk.p50 * 1.25;
+        const bool at_floor = s.p50 <= floor.p50 * 1.25;
         std::printf("    {\"name\": %s, \"n\": %zu, \"min\": %.0f, \"p50\": %.0f, "
                     "\"p90\": %.0f, \"p99\": %.0f, \"p999\": %.0f, \"p9999\": %.0f, "
                     "\"max\": %.0f, \"mean\": %.1f, \"stddev\": %.1f, "

@@ -111,6 +111,26 @@ End-to-end = validate tick → book update → top-of-book read → pre-trade ri
 encode NewOrderSingle. **Excludes network, kernel and venue time**, which dominate
 real wire-to-wire latency.
 
+### Per-operation latency (RDTSC, p50 → p99.9)
+
+Throughput answers "how many"; a trading path lives or dies on the tail. Timed
+with RDTSC because `clock_gettime` costs 55ns here — more than several of these
+operations — and **0 of 12 measurements now sit at the timer floor** (was 3 of 12).
+
+| Operation | p50 | p99 | p99.9 |
+|---|---|---|---|
+| Top-of-book read | 26 ns | 31 ns | 33 ns |
+| Pre-trade risk check | 29 ns | 37 ns | 40 ns |
+| Book update | 65 ns | 101 ns | 124 ns |
+| **Tick → order** | **191 ns** | **309 ns** | **430 ns** |
+| Handoff, lock-free SPSC ring | 89 ns | 166 ns | **204 ns** |
+| Handoff, mutex + condvar | 4,916 ns | 9,899 ns | **74,532 ns** |
+
+The p50 gap between the ring and the mutex is 55×; **the p99.9 gap is 365×**. A
+mutex is not merely slower on average — its tail is unbounded, because the wake-up
+is a syscall and a producer descheduled holding the lock stops the consumer for a
+whole scheduling quantum.
+
 
 ```
 quantgenlabs/
