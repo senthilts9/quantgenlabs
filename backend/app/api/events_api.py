@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..core.events import TOPICS, backend_name, get_bus, spec
 from ..core.events.publishers import publish_stats
+from ..obs import trading_metrics as tm
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -23,6 +24,16 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 def status() -> dict:
     bus = get_bus()
     stats = bus.stats() if hasattr(bus, "stats") else {}
+    # Refresh the lag gauges on scrape rather than on a timer: lag only matters
+    # when someone is looking, and a background thread updating them would be a
+    # thread whose failure is invisible.
+    for topic in TOPICS:
+        for group in ("oms", "pnl", "ui"):
+            try:
+                for part, lag in (bus.lag(topic, group) or {}).items():
+                    tm.BUS_LAG.labels(topic=topic, group=group).set(lag)
+            except Exception:
+                pass
     return {
         "backend": backend_name(),
         "publisher": publish_stats(),

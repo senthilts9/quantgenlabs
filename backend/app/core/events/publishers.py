@@ -28,6 +28,7 @@ import logging
 import threading
 
 from . import get_bus
+from ...obs import trading_metrics as tm
 
 log = logging.getLogger(__name__)
 
@@ -53,10 +54,12 @@ def _safe(topic: str, key: str, payload: dict, correlation_id: str | None = None
         get_bus().publish(topic, key, payload, correlation_id=correlation_id)
         with _lock:
             _published += 1
+        tm.observe_bus(topic, ok=True)
         return True
     except Exception as e:                       # noqa: BLE001 - deliberate
         with _lock:
             _failures += 1
+        tm.observe_bus(topic, ok=False)
         log.warning("event publish failed on %s: %s", topic, e)
         return False
 

@@ -3,9 +3,14 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: meridian-backend
-    metrics_path: /metrics
+  - job_name: quantgenlabs-api
+    # Trailing slash deliberately. /metrics is an ASGI sub-app mount, so without
+    # it Starlette answers 307 with an ABSOLUTE Location header. Prometheus does
+    # follow that, so it works -- but it costs an extra round trip on every
+    # 5-second scrape, and behind a proxy the absolute URL can point somewhere
+    # the scraper cannot reach.
+    metrics_path: /metrics/
     static_configs:
       - targets: ["api:8000"]   # docker-compose service name
         labels:
-          service: meridian
+          service: quantgenlabs

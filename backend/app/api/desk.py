@@ -32,6 +32,7 @@ from ..core.auth import Permission, require
 from ..core.events import publishers
 from ..core.pnl import PnLProjection
 from ..obs import tracing
+from ..obs import trading_metrics as tm
 
 router = APIRouter(prefix="/api/desk", tags=["trading desk"])
 
@@ -142,13 +143,18 @@ def _publish_order_events(s: DeskSession, desk_id: str, cl_ord_id: str,
                 continue
             s.published_fills.add(exec_id)
             fix_side = "buy" if side == "1" else "sell"
+            tm.FILLS.labels(symbol=sym, side=fix_side).inc()
+            tm.FILLED_QTY.labels(symbol=sym, side=fix_side).inc(float(f["qty"]))
             publishers.trade_executed(
                 cl_ord_id=cl_ord_id, exec_id=exec_id, symbol=sym,
                 side=fix_side, qty=f["qty"], price=f["price"], desk_id=desk_id)
             s.pnl.apply_fill(symbol=sym, side=fix_side, qty=f["qty"],
                              price=f["price"], exec_id=exec_id)
 
+        if status in ("filled", "cancelled", "rejected"):
+            tm.ORDERS_TERMINAL.labels(symbol=sym, status=status).inc()
         if status == "rejected" and reject:
+            tm.observe_pretrade(reject)
             publishers.risk_breached(symbol=sym, decision=reject, side=side,
                                      qty=cum + leaves, price=avg)
 
@@ -166,9 +172,18 @@ def _publish_order_events(s: DeskSession, desk_id: str, cl_ord_id: str,
             bid, ask = b.best(mc.Side.BID), b.best(mc.Side.ASK)
         if bid and ask:
             mid = ((bid[0] + ask[0]) / 2.0) * ts
+            tm.BOOK_SPREAD.labels(symbol=sym).set((ask[0] - bid[0]) * ts)
+            tm.observe_tick("accepted")
             publishers.market_tick(symbol=sym, seq=0, price=mid, size=0.0,
                                    verdict="accepted")
             s.pnl.apply_mark(sym, mid)
+            tm.FEED_STALE.labels(symbol=sym).set(0)
+
+        # P&L and position gauges, refreshed whenever the desk acts.
+        with s.lock:
+            tm.set_pnl(s.pnl.totals())
+            for pos in s.pnl.positions(include_flat=True):
+                tm.POSITION_QTY.labels(symbol=pos.symbol).set(pos.net_qty)
     except Exception:            # noqa: BLE001 - must never break the order path
         pass
 
@@ -281,8 +296,14 @@ def submit_order(desk_id: str, req: OrderRequest) -> dict:
             "qgl.cl_ord_id": cl, "qgl.symbol": req.symbol, "qgl.side": req.side,
             "qgl.qty": float(req.qty), "qgl.ord_type": req.ord_type, "qgl.tif": req.tif,
         }):
+            _t0 = time.perf_counter()
             s.desk.submit(cl, req.symbol, req.side, req.qty, req.price,
                           req.ord_type, req.tif, _now_ns(s))
+            tm.ORDER_ROUND_TRIP.labels(symbol=req.symbol).observe(
+                time.perf_counter() - _t0)
+            tm.ORDERS_SUBMITTED.labels(symbol=req.symbol,
+                                       side="buy" if req.side == "1" else "sell",
+                                       ord_type="market" if req.ord_type == "1" else "limit").inc()
 
         # Events are published AFTER the state change is committed. Publishing
         # "filled" before the fill is recorded is a lie the rest of the system

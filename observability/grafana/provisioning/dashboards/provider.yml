@@ -1,10 +1,16 @@
 apiVersion: 1
 providers:
-  - name: Meridian
+  - name: QuantGenLabs
     orgId: 1
-    folder: Meridian
+    folder: QuantGenLabs
     type: file
+    # Deletion stays disabled: a dashboard removed from disk should disappear
+    # from the provisioning folder, not be destroyed in Grafana where someone
+    # may have forked it.
     disableDeletion: false
     updateIntervalSeconds: 15
     options:
+      # Every .json in this directory is loaded, so adding a dashboard needs no
+      # change here. Currently: meridian.json (engine and HTTP latency) and
+      # trading.json (order flow, pre-trade risk, P&L, algos, event bus).
       path: /var/lib/grafana/dashboards

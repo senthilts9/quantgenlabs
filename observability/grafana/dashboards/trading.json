@@ -1,0 +1,270 @@
+{
+  "title": "QuantGenLabs — Trading Desk",
+  "uid": "qgl-trading",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "symbol",
+        "type": "query",
+        "datasource": null,
+        "query": "label_values(qgl_orders_submitted_total, symbol)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Order flow — is the desk actually trading?",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Orders submitted (5m rate)",
+      "description": "The first question a trading dashboard must answer: is anything happening at all? The engine panels can look perfectly healthy while the desk has not sent an order in an hour.",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2 } },
+      "targets": [
+        { "expr": "sum(rate(qgl_orders_submitted_total{symbol=~\"$symbol\"}[5m]))", "legendFormat": "submitted/s" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Fill ratio (5m)",
+      "description": "Orders reaching 'filled' as a share of all terminal outcomes. A falling ratio with steady submissions means the venue is rejecting or the book has moved away — two different problems that look identical on an order-count panel alone.",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0, "max": 1,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "orange", "value": 0.5 },
+            { "color": "green", "value": 0.8 }
+          ] }
+        }
+      },
+      "targets": [
+        { "expr": "sum(rate(qgl_orders_terminal_total{status=\"filled\",symbol=~\"$symbol\"}[5m])) / clamp_min(sum(rate(qgl_orders_terminal_total{symbol=~\"$symbol\"}[5m])), 0.0001)", "legendFormat": "fill ratio" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Terminal outcomes by status",
+      "description": "filled / cancelled / rejected split. A rise in cancelled is an execution problem; a rise in rejected is a control or data problem. Aggregating them hides which.",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+      "targets": [
+        { "expr": "sum by (status) (rate(qgl_orders_terminal_total{symbol=~\"$symbol\"}[5m]))", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Filled quantity by side",
+      "description": "Quantity, not fill count. One fill of 10,000 and ten fills of 1,000 are operationally different, and only this panel tells them apart.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "sum by (side) (rate(qgl_filled_quantity_total{symbol=~\"$symbol\"}[5m]))", "legendFormat": "{{side}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Order round trip (in-process)",
+      "description": "Submit to final ExecutionReport. EXCLUDES network, kernel and venue time, which dominate a real deployment — this measures the connectivity layer's own cost, not wire-to-wire latency.",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 5 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(qgl_order_round_trip_seconds_bucket[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(qgl_order_round_trip_seconds_bucket[5m])))", "legendFormat": "p99" },
+        { "expr": "histogram_quantile(0.999, sum by (le) (rate(qgl_order_round_trip_seconds_bucket[5m])))", "legendFormat": "p99.9" }
+      ]
+    },
+
+    {
+      "id": 200,
+      "type": "row",
+      "title": "Pre-trade risk — what was stopped, and why",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Kill switch",
+      "description": "1 when engaged. A state, so a gauge — a counter here would be meaningless.",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [ { "type": "value", "options": {
+            "0": { "text": "ARMED", "color": "green" },
+            "1": { "text": "ENGAGED", "color": "red" } } } ]
+        }
+      },
+      "targets": [ { "expr": "max(qgl_kill_switch_engaged)", "legendFormat": "kill switch" } ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Pre-trade decisions by reason",
+      "description": "The reason label is what makes this actionable. 'Rejections are up' is not a finding; 'price_collar rejections are up' points at a stale reference price, and 'position_limit' points at a mandate.",
+      "gridPos": { "h": 8, "w": 10, "x": 4, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 15 } } },
+      "targets": [
+        { "expr": "sum by (decision) (rate(qgl_pretrade_decisions_total[5m]))", "legendFormat": "{{decision}}" }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Market data quality by verdict",
+      "description": "A gap means messages were lost and the book needs recovery. A duplicate means the transport is retransmitting. A reorder means it is not preserving order. Three different faults that all look like 'bad sequence number'.",
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "targets": [
+        { "expr": "sum by (verdict) (rate(qgl_market_ticks_total[5m]))", "legendFormat": "{{verdict}}" }
+      ]
+    },
+
+    {
+      "id": 300,
+      "type": "row",
+      "title": "P&L and positions",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "P&L by component",
+      "description": "Realised and unrealised are separated because they are different kinds of number: realised is a fact that never moves with the market, unrealised is an opinion only as good as its mark.",
+      "gridPos": { "h": 7, "w": 10, "x": 0, "y": 23 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } },
+      "targets": [
+        { "expr": "qgl_pnl{component=\"realized\"}", "legendFormat": "realised" },
+        { "expr": "qgl_pnl{component=\"unrealized\"}", "legendFormat": "unrealised" },
+        { "expr": "qgl_pnl{component=\"total\"}", "legendFormat": "total" }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "stat",
+      "title": "Positions with no fresh mark",
+      "description": "Open positions EXCLUDED from unrealised P&L because their mark is stale or missing. Any non-zero value means the P&L total on this dashboard is PARTIAL — which is why it is a panel and not a footnote.",
+      "gridPos": { "h": 7, "w": 4, "x": 10, "y": 23 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 1 }
+          ] }
+        }
+      },
+      "targets": [ { "expr": "max(qgl_positions_unvalued)", "legendFormat": "unvalued" } ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Net position by symbol",
+      "gridPos": { "h": 7, "w": 10, "x": 14, "y": 23 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "qgl_position_quantity{symbol=~\"$symbol\"}", "legendFormat": "{{symbol}}" }
+      ]
+    },
+
+    {
+      "id": 400,
+      "type": "row",
+      "title": "Execution algos — TWAP / VWAP / POV",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 }
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "Working parents",
+      "description": "Parent orders currently being executed. A parent that stays here without its slice count advancing is stuck.",
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 31 },
+      "targets": [ { "expr": "sum by (algo) (qgl_algo_active)", "legendFormat": "{{algo}}" } ]
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Child slices sent",
+      "gridPos": { "h": 5, "w": 10, "x": 4, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "targets": [
+        { "expr": "sum by (algo) (rate(qgl_algo_slices_total[5m]))", "legendFormat": "{{algo}}" }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Implementation shortfall (bps) vs arrival",
+      "description": "Signed so POSITIVE IS ALWAYS BAD: a buyer paying above arrival and a seller receiving below it are the same failure, so the two aggregate. Measured against the mid at the moment the parent was accepted — everything after that is a cost of the decision to trade. Measuring against the average of your own fills is circular and always flatters the algo.",
+      "gridPos": { "h": 5, "w": 10, "x": 14, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "none", "decimals": 2 } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (algo, le) (rate(qgl_algo_shortfall_bps_bucket[30m])))", "legendFormat": "{{algo}} p50" },
+        { "expr": "histogram_quantile(0.95, sum by (algo, le) (rate(qgl_algo_shortfall_bps_bucket[30m])))", "legendFormat": "{{algo}} p95" }
+      ]
+    },
+
+    {
+      "id": 500,
+      "type": "row",
+      "title": "Event bus and market data",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Consumer lag by topic and group",
+      "description": "The number an operator watches. Lag that grows monotonically means a consumer is falling behind permanently rather than absorbing a burst — the distinction is the slope, not the level.",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "expr": "qgl_bus_consumer_lag", "legendFormat": "{{topic}}/{{group}}" }
+      ]
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Publish failures and dead letters",
+      "description": "A non-zero publish failure rate means the event log is incomplete while trading continued. That is a deliberate trade — a bus failure must not fail a trade — but it must be visible, because the log is no longer a complete record.",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 37 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null }, { "color": "red", "value": 0.001 } ] }
+        }
+      },
+      "targets": [
+        { "expr": "sum by (topic) (rate(qgl_bus_publish_failed_total[5m]))", "legendFormat": "failed {{topic}}" },
+        { "expr": "sum by (topic) (rate(qgl_bus_dead_lettered_total[5m]))", "legendFormat": "DLQ {{topic}}" }
+      ]
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "Top-of-book spread",
+      "description": "Per symbol, because an aggregate spread across instruments is not a number that means anything. A spread that widens sharply is a liquidity event; one that goes to zero is usually a data fault.",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 37 },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 } },
+      "targets": [
+        { "expr": "qgl_book_spread{symbol=~\"$symbol\"}", "legendFormat": "{{symbol}}" }
+      ]
+    }
+  ]
+}

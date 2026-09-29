@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Histogram, make_asgi_app
 from pydantic import BaseModel
 
-from .api import (auth, connectivity, desk, events_api, stream, bench, cryptodesk, cryptodesk_auth, frm, genai, marketdata,
+from .api import (algo, auth, connectivity, desk, events_api, stream, bench, cryptodesk, cryptodesk_auth, frm, genai, marketdata,
                   observability, oms, dex_board, portfolio, pricing,
                   quanthub, rates, risk, sor, tca)
 from .core import crypto
@@ -89,6 +89,7 @@ app.include_router(desk.router)
 app.include_router(stream.router)
 app.include_router(events_api.router)
 app.include_router(events_api.pnl_router)
+app.include_router(algo.router)
 app.include_router(frm.router)
 app.include_router(quanthub.router)
 app.include_router(genai.router)

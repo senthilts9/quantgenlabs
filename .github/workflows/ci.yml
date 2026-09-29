@@ -102,6 +102,36 @@ jobs:
               print("secrets.example.yaml looks like it holds real values"); bad += 1
           sys.exit(1 if bad else 0)
           PY
+      - name: Validate Grafana dashboards and Prometheus config
+        run: |
+          set -e
+          pip install pyyaml
+          python - <<'PY'
+          import json, pathlib, re, sys, yaml
+          bad = 0
+          # Every panel query must reference a metric the code actually declares.
+          src = pathlib.Path("backend/app/obs/trading_metrics.py").read_text()
+          declared = set(re.findall(r'"(qgl_[a-z_0-9]+)"', src))
+          for f in pathlib.Path("observability/grafana/dashboards").glob("*.json"):
+              d = json.loads(f.read_text())
+              ids = [p["id"] for p in d["panels"]]
+              if len(ids) != len(set(ids)):
+                  print(f"{f.name}: duplicate panel ids"); bad += 1
+              for p in d["panels"]:
+                  for t in p.get("targets", []):
+                      for m in re.findall(r"qgl_[a-z_0-9]+", t["expr"]):
+                          base = re.sub(r"_(bucket|count|sum)$", "", m)
+                          if not (m in declared or base in declared
+                                  or f"{base}_total" in declared):
+                              print(f"{f.name} panel {p['id']}: {m} is not declared")
+                              bad += 1
+              print(f"{f.name}: {len(d['panels'])} panels ok")
+          yaml.safe_load(pathlib.Path("observability/prometheus.yml").read_text())
+          yaml.safe_load(pathlib.Path(
+              "observability/grafana/provisioning/dashboards/provider.yml").read_text())
+          sys.exit(1 if bad else 0)
+          PY
+
       - name: Validate docker-compose
         run: docker compose -f docker-compose.yml config --quiet
       - name: Build the API image

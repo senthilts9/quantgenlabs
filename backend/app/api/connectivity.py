@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from ..core import connectivity as conn
 from ..core.auth import Permission, require
+from ..obs import trading_metrics as tm
 
 router = APIRouter(prefix="/api/connectivity", tags=["connectivity"])
 
@@ -244,6 +245,8 @@ def pretrade(req: PreTradeRequest) -> dict:
     t0 = time.perf_counter()
     decision = gate.check(0, req.side, req.qty, req.price, req.reference_price, req.reference_ok)
     elapsed = time.perf_counter() - t0
+    tm.observe_pretrade(mc.decision_name(decision))
+    tm.KILL_SWITCH.set(1 if gate.kill_switch_engaged() else 0)
 
     return {
         "impl": conn.impl_name(),

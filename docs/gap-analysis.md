@@ -24,14 +24,14 @@ overstated some things.
 | 6 | C++ low-latency core | Partial | **Good** | Book, feed handler, FIX engine, pre-trade risk, matching engine, plus a lock-free SPSC ring and a **latency-distribution harness (P50/P90/P99/P99.9)** — the tail figures §6 asked for and earlier throughput work had not answered. |
 | 7 | FIX protocol / connectivity | **Absent** | **Good** | Wire format + session layer + simulated venue, 48 tests. Logon/Heartbeat/TestRequest/Resend/NewOrderSingle/ExecutionReport/Cancel/CancelReplace/Reject/Logout. |
 | 8 | Complete trade lifecycle | Partial | **Good** | End to end and runnable (`lifecycle_demo`). Allocation, confirmation, settlement and reconciliation still absent. |
-| 9 | OMS / EMS / SOR | **Good** | **Good** | Already strong: marginal-cost routing, ML fill probability, TCA. Unchanged by this work. |
+| 9 | OMS / EMS / SOR | **Good** | **Good** | Marginal-cost routing, ML fill probability, TCA. Now also **TWAP / VWAP / POV execution algos** on the institutional desk with slice scheduling, pause/resume/cancel, and implementation shortfall against the arrival mid. |
 | 10 | Pricing engine | **Good** | **Good** | BSM, Black-76, binomial, MC, LSM American, GARCH, curves, PCA. Heston/SABR/local-vol absent. |
 | 11 | Risk engine | **Good** | **Good** | VaR/ES (historical, parametric, MC), EVT tails, stress, Greeks, limits. CVA/PFE absent. |
 | 12 | Real-time P&L | Partial | **Good** | A projection over the event stream: realised/unrealised separated, stale marks excluded and reported rather than silently valued, attribution whose components must sum to the observed change, reconciliation against the desk, and rebuild-from-log as the correctness check. |
 | 13 | **Crypto trading — must be retained** | **Good** | **Good** | `backend/cryptodesk` (12.9k LOC) and `frontend/src/cryptodesk` (9k LOC) **untouched**. Verified by `verify_crypto.py` still passing. |
 | 14 | Portfolio management | **Good** | **Good** | Markowitz, efficient frontier, risk parity, attribution, stress. |
 | 15 | Enterprise UI/UX | Partial | **Good** | Command palette (⌘K, fuzzy), light/dark theme on CSS tokens, virtualised sortable/filterable table with CSV export, Trading Desk with ladder + ticket + blotter + FIX monitor, and **WebSocket streaming with reconnect, gap detection and a data-freshness indicator**. Still missing: resizable panels, saved workspaces. |
-| 16 | Observability / SRE | Partial | **Good** | Prometheus + Grafana, plus OpenTelemetry tracing correlated on ClOrdID and an X-Trace-Id response header. Opt-in via QGL_TRACING. |
+| 16 | Observability / SRE | Partial | **Good** | Prometheus (**6 → 28 metrics**, covering order flow, pre-trade decisions by reason, market-data verdicts, P&L, event-bus lag/DLQ, FIX sessions and algo shortfall), a dedicated **Trading Desk Grafana dashboard** (17 panels), OpenTelemetry tracing correlated on ClOrdID, and an X-Trace-Id response header. CI asserts every panel query references a metric the code declares. |
 | 17 | Security / RBAC | **Absent** | **Good** | JWT + scrypt + four roles as separations of duty (trader cannot set limits, risk cannot trade, admin is not a superset). Opt-in via QGL_REQUIRE_AUTH; the ENABLED path is tested. Crypto desk keeps its wallet-signature auth. |
 | 18 | Testing | Partial | **Good** | 155 C++ (was 9), 275 Python (was 48), 16 frontend units (was 0), 5 property, 3 verifiers. Load/soak/failure-recovery still absent. |
 | 19 | Benchmark / performance lab | Partial | **Good** | Throughput harness *and* a latency-distribution harness that measures the clock's own cost first and flags any result sitting at that floor. Surfaced in a Performance Lab screen that cannot display a number the harness did not produce. |
@@ -50,6 +50,10 @@ overstated some things.
 Still Partial: **§20 institutional features** (security master, reconciliation
 engine, EOD/SOD, model governance) and **§21 repository structure** (deliberately
 not restructured — see the note at the end).
+
+Execution algos (§9) and trading observability (§16) were extended in the
+deployment pass: TWAP/VWAP/POV with TCA, and the Prometheus metric set grown from
+6 to 28 with a Grafana dashboard built on them.
 
 No section is entirely absent. Two carry an explicit caveat rather than a clean
 bill:
