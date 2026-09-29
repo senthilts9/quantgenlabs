@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qgl-api
+  namespace: quantgenlabs
+  labels: { app.kubernetes.io/name: qgl-api }
+spec:
+  # TWO REPLICAS MINIMUM, and never zero. The trading desk holds FIX sessions in
+  # process memory: sequence numbers only mean something within one connection,
+  # so a pod that dies takes its sessions with it. Two replicas means a rolling
+  # update does not black-hole the API; it does NOT make sessions survive, which
+  # is what the PostgreSQL work would change.
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app.kubernetes.io/name: qgl-api }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: qgl-api }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api
+          image: ghcr.io/senthilts9/quantgenlabs-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: qgl-config }
+          env:
+            - name: QGL_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: qgl-secrets, key: jwt-secret } }
+            - name: QGL_USERS
+              valueFrom: { secretKeyRef: { name: qgl-secrets, key: users } }
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef: { name: qgl-secrets, key: anthropic-api-key, optional: true }
+            # Uncomment to run the OMS on PostgreSQL. Unset, it keeps its SQLite
+            # book -- which with >1 replica means each pod has its OWN book, so
+            # this is required before scaling past one pod matters.
+            # - name: QGL_DATABASE_URL
+            #   value: "postgresql://qgl:$(POSTGRES_PASSWORD)@qgl-postgres:5432/quantgenlabs"
+            # - name: POSTGRES_PASSWORD
+            #   valueFrom: { secretKeyRef: { name: qgl-secrets, key: postgres-password } }
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            # The Monte Carlo and risk engines are CPU-bound and will use every
+            # core they are given; the limit is what stops one pricing request
+            # starving its neighbours on the node.
+            limits: { cpu: "2", memory: "2Gi" }
+          # Startup probe first: the C++ extensions and the warm-board service
+          # make first boot slower than steady state, and without this a slow
+          # start looks like a liveness failure and the pod is killed in a loop.
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: data, mountPath: /app/data }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        # readOnlyRootFilesystem means the app needs explicit writable mounts.
+        # /app/data is where core/paths.py resolves to inside a container.
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      # Give in-flight requests time to finish before the container is killed.
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qgl-api
+  namespace: quantgenlabs
+spec:
+  selector: { app.kubernetes.io/name: qgl-api }
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: qgl-api
+  namespace: quantgenlabs
+spec:
+  # At least one pod stays up through a voluntary disruption (node drain,
+  # cluster upgrade). Without this, a drain can evict both replicas at once.
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: qgl-api }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: qgl-api
+  namespace: quantgenlabs
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: qgl-api }
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown:
+      # Slow scale-down: a pod removed mid-session drops its FIX sessions, so
+      # shedding capacity eagerly during a lull costs more than the capacity
+      # saves. Five minutes of stability before removing a pod.
+      stabilizationWindowSeconds: 300
+      policies: [{ type: Pods, value: 1, periodSeconds: 120 }]

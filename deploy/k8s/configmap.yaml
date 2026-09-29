@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qgl-config
+  namespace: quantgenlabs
+data:
+  QGL_ENV: "production"
+  # Tracing off by default. Enabling it without a collector makes the exporter
+  # fall back to stdout, which floods pod logs.
+  QGL_TRACING: "false"
+  QGL_TRACE_SAMPLE_RATIO: "0.05"
+  # Auth enforcement. Enabling this WITHOUT provisioning users in the secret
+  # locks every guarded endpoint with no way in, so they are set together.
+  QGL_REQUIRE_AUTH: "true"
+  ANTHROPIC_MODEL: "claude-haiku-4-5"
+  # The engine selector; "auto" prefers the compiled extensions and falls back
+  # to numpy if a build is missing.
+  QUANT_ENGINE: "auto"

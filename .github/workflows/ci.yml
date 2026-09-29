@@ -34,7 +34,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install numpy scipy fastapi pydantic prometheus-client pytest hypothesis pybind11
+      - run: pip install numpy scipy fastapi pydantic prometheus-client pytest hypothesis pybind11 httpx
+      # The relational, auth and tracing suites. pgserver ships real PostgreSQL
+      # binaries as a wheel, so the repository tests run against an actual server
+      # in CI with no service container to provision.
+      - run: pip install "sqlalchemy>=2.0" alembic "psycopg[binary]" pgserver pyjwt opentelemetry-sdk opentelemetry-instrumentation-fastapi
       - name: Build pybind11 extensions (C++/Python parity tests need them)
         run: ./scripts/build_bindings.sh
       - name: Property tests (pytest + Hypothesis)
@@ -58,3 +62,42 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - run: cd frontend && npm install && npm run build
+
+  deploy-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Kubernetes manifests
+        run: |
+          set -e
+          pip install pyyaml
+          python - <<'PY'
+          import pathlib, sys, yaml
+          bad = 0
+          for f in sorted(pathlib.Path("deploy/k8s").glob("*.yaml")):
+              for d in yaml.safe_load_all(f.read_text()):
+                  if not d:
+                      continue
+                  if "kind" not in d or "apiVersion" not in d:
+                      print(f"{f}: document missing kind/apiVersion"); bad += 1
+          # The example secret must never carry a real-looking value.
+          txt = pathlib.Path("deploy/k8s/secrets.example.yaml").read_text()
+          if "sk-ant-" in txt.split("#")[0] or "REPLACE-ME" not in txt:
+              print("secrets.example.yaml looks like it holds real values"); bad += 1
+          sys.exit(1 if bad else 0)
+          PY
+      - name: Validate docker-compose
+        run: docker compose -f docker-compose.yml config --quiet
+      - name: Build the API image
+        run: docker build -f deploy/Dockerfile.api -t qgl-api:ci .
+      - name: The connectivity extension must be in the image
+        run: |
+          docker run --rm qgl-api:ci python -c "
+          import mkt_connectivity, quant_engine_cpp
+          d = mkt_connectivity.SimulatedDesk(1, 50000, 0.01)
+          d.start(0)
+          assert d.connected(), 'FIX session failed to come up in the image'
+          print('mkt_connectivity ok in image')
+          "
+      - name: Build the web image
+        run: docker build -f deploy/Dockerfile.web -t qgl-web:ci .

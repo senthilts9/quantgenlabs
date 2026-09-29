@@ -1,0 +1,68 @@
+# OPTIONAL. Omit this file to keep the OMS on its SQLite book.
+#
+# A StatefulSet, not a Deployment: a database needs a stable identity and a
+# volume that follows it. A Deployment with a PVC works until the first rollout
+# reschedules the pod and the new one cannot attach the volume the old one still
+# holds.
+apiVersion: v1
+kind: Service
+metadata:
+  name: qgl-postgres
+  namespace: quantgenlabs
+spec:
+  # Headless: clients resolve the pod directly. A load-balanced Service in front
+  # of a single-writer database only adds a hop that can fail.
+  clusterIP: None
+  selector: { app.kubernetes.io/name: qgl-postgres }
+  ports: [{ name: pg, port: 5432, targetPort: pg }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qgl-postgres
+  namespace: quantgenlabs
+spec:
+  serviceName: qgl-postgres
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: qgl-postgres }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: qgl-postgres }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{ name: pg, containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_USER, value: qgl }
+            - { name: POSTGRES_DB, value: quantgenlabs }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: qgl-secrets, key: postgres-password } }
+            # The default mount point is the volume root; on many storage classes
+            # that contains a lost+found directory and initdb refuses a non-empty
+            # directory. A subdirectory avoids a first-boot failure that looks
+            # like a broken image.
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          resources:
+            requests: { cpu: "200m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "qgl", "-d", "quantgenlabs"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["pg_isready", "-U", "qgl", "-d", "quantgenlabs"] }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: 20Gi } }

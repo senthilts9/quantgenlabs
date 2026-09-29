@@ -5,7 +5,22 @@ services:
   api:
     build: { context: ., dockerfile: deploy/Dockerfile.api }
     env_file: .env
-    environment: { ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-haiku-4-5}" }
+    environment:
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-haiku-4-5}"
+      # Relational store. Commented out by default: with it unset the OMS keeps
+      # using its SQLite book, so `docker compose up` works with no database to
+      # provision. Uncomment together with the `postgres` service below.
+      # QGL_DATABASE_URL: "postgresql://qgl:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/quantgenlabs"
+      #
+      # Auth enforcement is OFF unless explicitly enabled, because turning it on
+      # without provisioning QGL_USERS locks every guarded endpoint with no way
+      # in. Set both together or neither.
+      QGL_REQUIRE_AUTH: "${QGL_REQUIRE_AUTH:-}"
+      QGL_USERS: "${QGL_USERS:-}"
+      QGL_JWT_SECRET: "${QGL_JWT_SECRET:-}"
+      QGL_ENV: "${QGL_ENV:-production}"
+      QGL_TRACING: "${QGL_TRACING:-}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
     ports: ["8000:8000"]
     restart: unless-stopped
     volumes:
@@ -59,8 +74,33 @@ services:
       shared_web:
         aliases: [qgl-grafana]
 
+  # Uncomment with QGL_DATABASE_URL above to run the OMS on PostgreSQL. The
+  # crypto desk stays on SQLite either way -- it is self-contained and gains
+  # nothing it needs from a server.
+  #
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: qgl
+  #     POSTGRES_DB: quantgenlabs
+  #     # No default. A database password with a fallback is a password everyone
+  #     # knows, and compose will refuse to start rather than use one.
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  #   volumes:
+  #     - pg-data:/var/lib/postgresql/data
+  #   # The API must not start against a database that is not accepting
+  #   # connections yet -- depends_on alone only waits for the container, not
+  #   # for readiness.
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U qgl -d quantgenlabs"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 10
+  #   restart: unless-stopped
+
 volumes:
   oms-data:
+  # pg-data:
 
 networks:
   default: {}

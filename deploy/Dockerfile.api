@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir pybind11
 WORKDIR /build
 COPY cpp ./cpp
-# Compiled directly rather than through cmake: two translation units with no
-# external dependencies do not need a build system, and this avoids pulling
-# cmake into the image just to invoke g++ twice.
+# Compiled directly rather than through cmake: a handful of translation units
+# with no external dependencies do not need a build system, and this avoids
+# pulling cmake into the image just to invoke g++ a few times.
 #
 # -O3 with PORTABLE flags only. -march=native would be faster here but bakes
 # in the build machine's instruction set, and the resulting binary can fault
@@ -25,7 +25,18 @@ RUN set -eux; \
     g++ -O3 -Wall -shared -std=c++20 -fPIC -pthread \
         -Icpp/include $PBINC -I"$PYINC" \
         cpp/src/crypto_bindings.cpp -o "qgl_xrpl_crypto${EXT}"; \
+    g++ -O3 -Wall -shared -std=c++20 -fPIC -pthread \
+        -Icpp/include $PBINC -I"$PYINC" \
+        cpp/src/mkt_bindings.cpp -o "mkt_connectivity${EXT}"; \
     ls -la *.so
+
+# The connectivity core has no Python fallback for the matching engine, the
+# pre-trade gate or the FIX parser -- by design, since a second unverified
+# implementation of a risk control is worse than a clear error. So unlike the
+# other two, a failed build here does NOT degrade gracefully: it takes the
+# Trading Desk and Connectivity screens offline with a 503. Fail the build
+# rather than ship an image that 503s at runtime.
+RUN test -f /build/mkt_connectivity*.so || (echo "mkt_connectivity failed to build" && exit 1)
 
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PYTHONPATH=/app
