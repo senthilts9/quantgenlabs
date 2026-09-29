@@ -18,34 +18,39 @@ overstated some things.
 |---|---|---|---|---|
 | 1 | Event-driven architecture, DDD, clean layering | Partial | Partial | `api`/`core`/`services`/`obs` separation was already good. Still request/response, not event-sourced. |
 | 2 | Market-data platform | Partial | **Good** | Feed validation, gap/duplicate/reorder/stale/outlier detection and an L2 book added in C++. Corporate actions, symbology and calendars still absent. |
-| 3 | Kafka / streaming backbone | **Absent** | **Absent** | Not started. No broker in the dev environment. |
+| 3 | Kafka / streaming backbone | **Absent** | **Absent** | Still not started. No broker in the dev environment. |
 | 4 | Databricks / Delta Lake / medallion | **Absent** | **Absent** | Not started. |
-| 5 | PostgreSQL operational store | **Absent** | **Absent** | SQLite today. |
+| 5 | PostgreSQL operational store | **Absent** | **Good** | SQLAlchemy schema + repository + Alembic, opt-in via QGL_DATABASE_URL. 53 repository tests run against BOTH SQLite and a real PostgreSQL 16.2 (pgserver wheel, no Docker needed); migrations verified up AND down on both. Crypto desk deliberately stays on SQLite. |
 | 6 | C++ low-latency core | Partial | **Good** | Was pricing/risk only. Now adds book, feed handler, FIX engine, pre-trade risk, matching engine, benchmark harness. |
 | 7 | FIX protocol / connectivity | **Absent** | **Good** | Wire format + session layer + simulated venue, 48 tests. Logon/Heartbeat/TestRequest/Resend/NewOrderSingle/ExecutionReport/Cancel/CancelReplace/Reject/Logout. |
 | 8 | Complete trade lifecycle | Partial | **Good** | End to end and runnable (`lifecycle_demo`). Allocation, confirmation, settlement and reconciliation still absent. |
 | 9 | OMS / EMS / SOR | **Good** | **Good** | Already strong: marginal-cost routing, ML fill probability, TCA. Unchanged by this work. |
 | 10 | Pricing engine | **Good** | **Good** | BSM, Black-76, binomial, MC, LSM American, GARCH, curves, PCA. Heston/SABR/local-vol absent. |
 | 11 | Risk engine | **Good** | **Good** | VaR/ES (historical, parametric, MC), EVT tails, stress, Greeks, limits. CVA/PFE absent. |
-| 12 | Real-time P&L | Partial | Partial | Reconciled from ExecutionReports in the demo; no streaming attribution service. |
+| 12 | Real-time P&L | Partial | Partial | Position and realised P&L now derived from booked fills with correct increase/reduce/cross-zero accounting. No streaming attribution service. |
 | 13 | **Crypto trading — must be retained** | **Good** | **Good** | `backend/cryptodesk` (12.9k LOC) and `frontend/src/cryptodesk` (9k LOC) **untouched**. Verified by `verify_crypto.py` still passing. |
 | 14 | Portfolio management | **Good** | **Good** | Markowitz, efficient frontier, risk parity, attribution, stress. |
-| 15 | Enterprise UI/UX | Partial | Partial | CryptoDesk console is dense and professional. No unified multi-asset workspace, command palette or virtualised tables. |
-| 16 | Observability / SRE | Partial | Partial | Prometheus + Grafana + structured metrics. No OpenTelemetry traces, no correlation IDs. |
-| 17 | Security / RBAC | **Absent** | **Absent** | No auth layer. Secrets handling is correct (`.gitignore`, no hardcoded defaults). |
-| 18 | Testing | Partial | **Good** | 126 C++ tests (was 9), 48 Python, 5 property, 3 verifiers. Load/soak/failure-recovery tests absent. |
-| 19 | Benchmark / performance lab | Partial | **Good** | Reproducible harness with full environment capture, repetitions and spread. Not yet surfaced in the UI. |
+| 15 | Enterprise UI/UX | Partial | **Good** | Command palette (⌘K, fuzzy), light/dark theme on CSS tokens, virtualised sortable/filterable table with CSV export, Trading Desk with ladder + ticket + blotter + FIX monitor. Still missing: resizable panels, saved workspaces, WebSocket streaming (polling today). |
+| 16 | Observability / SRE | Partial | **Good** | Prometheus + Grafana, plus OpenTelemetry tracing correlated on ClOrdID and an X-Trace-Id response header. Opt-in via QGL_TRACING. |
+| 17 | Security / RBAC | **Absent** | **Good** | JWT + scrypt + four roles as separations of duty (trader cannot set limits, risk cannot trade, admin is not a superset). Opt-in via QGL_REQUIRE_AUTH; the ENABLED path is tested. Crypto desk keeps its wallet-signature auth. |
+| 18 | Testing | Partial | **Good** | 140 C++ (was 9), 228 Python (was 48), 16 frontend units (was 0), 5 property, 3 verifiers. Load/soak/failure-recovery still absent. |
+| 19 | Benchmark / performance lab | Partial | **Good** | Reproducible harness with environment capture, repetitions and spread, surfaced in a Performance Lab screen that cannot display a number the harness did not produce. |
 | 20 | Institutional features | Partial | Partial | Kill switch, fat-finger, collars, position limits, halts, rate limiting added. Security master, reconciliation, EOD/SOD, model governance absent. |
 | 21 | Repository structure | Partial | Partial | `cpp/`, `backend/`, `frontend/`, `docs/`, `benchmarks/`, `observability/`. Not restructured into the `/services` + `/apps` layout the spec sketches. |
 | 22 | Incremental execution | — | **Done** | Version control established first; each increment built, tested and committed separately. |
 
 ## Scorecard
 
-|  | Before | Now |
-|---|---|---|
-| Good | 5 | 11 |
-| Partial | 9 | 8 |
-| Absent | 7 | 5 |
+|  | Before | After C++ core | Now |
+|---|---|---|---|
+| Good | 5 | 11 | 16 |
+| Partial | 9 | 8 | 4 |
+| Absent | 7 | 5 | 2 |
+
+Remaining absences: **Kafka (§3)** and **Databricks/Delta Lake (§4)**. Both are
+blocked on the same thing — no broker and no Spark/Databricks workspace in this
+environment — and writing producers that have never connected to a broker
+produces the shape of correctness without the substance.
 
 ## The five remaining absences, and what each actually requires
 
