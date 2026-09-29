@@ -34,6 +34,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from ..core.paths import db_path
 from .cryptodesk_auth import require_actor
 
 router = APIRouter(prefix="/api/cryptodesk", tags=["crypto-desk"])
@@ -270,7 +271,9 @@ class LifecycleRequest(BaseModel):
 
 #: Runs are persisted to the API container's data volume, not its filesystem.
 #: A blotter that a `docker compose up` erases is a demo, not a record.
-_DB_PATH = os.environ.get("CRYPTODESK_DB_PATH", "/app/data/cryptodesk.db")
+# Shared resolver: this used to default to the container path "/app/data",
+# which is not writable outside Docker. CRYPTODESK_DB_PATH still wins.
+_DB_PATH = db_path("cryptodesk.db", "CRYPTODESK_DB_PATH")
 
 #: Retention. This endpoint is publicly reachable, so the table grows at
 #: whatever rate strangers call it; the oldest runs are also the least

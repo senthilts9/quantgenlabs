@@ -18,9 +18,11 @@ import sqlite3
 import threading
 from pathlib import Path
 
+from ..paths import db_path
 from .models import Fill, Order, OrderStatus, OrderType, Position, Side
 
-DEFAULT_DB = os.getenv("OMS_DB_PATH", "/app/data/oms.db")
+DEFAULT_DB = db_path("oms.db", "OMS_DB_PATH")
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS orders (

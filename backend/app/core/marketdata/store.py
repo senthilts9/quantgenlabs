@@ -49,11 +49,13 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..paths import db_path
+
 # Same volume as the OMS database (docker-compose mounts `oms-data` at
-# /app/data), so the store survives restarts and redeploys.
-DEFAULT_DB = os.getenv("EOD_DB_PATH",
-                       os.path.join(os.path.dirname(
-                           os.getenv("OMS_DB_PATH", "/app/data/oms.db")), "eod.db"))
+# the shared data directory), so the store survives restarts and redeploys.
+# Resolver lives in core/paths.py -- it used to default to the container
+# path "/app/data", which is not writable outside Docker.
+DEFAULT_DB = db_path("eod.db", "EOD_DB_PATH")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS eod_series (
