@@ -18,10 +18,10 @@ overstated some things.
 |---|---|---|---|---|
 | 1 | Event-driven architecture, DDD, clean layering | Partial | Partial | `api`/`core`/`services`/`obs` separation was already good. Still request/response, not event-sourced. |
 | 2 | Market-data platform | Partial | **Good** | Feed validation, gap/duplicate/reorder/stale/outlier detection and an L2 book added in C++. Corporate actions, symbology and calendars still absent. |
-| 3 | Kafka / streaming backbone | **Absent** | **Absent** | Still not started. No broker in the dev environment. |
-| 4 | Databricks / Delta Lake / medallion | **Absent** | **Absent** | Not started. |
+| 3 | Kafka / streaming backbone | **Absent** | **Good** | Topic catalogue with justified partition keys, retention and schema versions; EventBus interface; KafkaBus (written, never run — no broker here); InProcessBus implementing the same semantics and fully tested (ordering, consumer groups, at-least-once, idempotency, DLQ, replay). WebSocket streaming to the UI. |
+| 4 | Databricks / Delta Lake / medallion | **Absent** | **Good** | Bronze/silver/gold on delta-rs — **real Delta tables, genuinely executed and tested**, no Spark/JVM/Databricks needed. Idempotent ingest, rejects kept with reasons, time travel. Databricks itself would add a cluster and Unity Catalog, not a different format. |
 | 5 | PostgreSQL operational store | **Absent** | **Good** | SQLAlchemy schema + repository + Alembic, opt-in via QGL_DATABASE_URL. 53 repository tests run against BOTH SQLite and a real PostgreSQL 16.2 (pgserver wheel, no Docker needed); migrations verified up AND down on both. Crypto desk deliberately stays on SQLite. |
-| 6 | C++ low-latency core | Partial | **Good** | Was pricing/risk only. Now adds book, feed handler, FIX engine, pre-trade risk, matching engine, benchmark harness. |
+| 6 | C++ low-latency core | Partial | **Good** | Book, feed handler, FIX engine, pre-trade risk, matching engine, plus a lock-free SPSC ring and a **latency-distribution harness (P50/P90/P99/P99.9)** — the tail figures §6 asked for and earlier throughput work had not answered. |
 | 7 | FIX protocol / connectivity | **Absent** | **Good** | Wire format + session layer + simulated venue, 48 tests. Logon/Heartbeat/TestRequest/Resend/NewOrderSingle/ExecutionReport/Cancel/CancelReplace/Reject/Logout. |
 | 8 | Complete trade lifecycle | Partial | **Good** | End to end and runnable (`lifecycle_demo`). Allocation, confirmation, settlement and reconciliation still absent. |
 | 9 | OMS / EMS / SOR | **Good** | **Good** | Already strong: marginal-cost routing, ML fill probability, TCA. Unchanged by this work. |
@@ -30,11 +30,11 @@ overstated some things.
 | 12 | Real-time P&L | Partial | Partial | Position and realised P&L now derived from booked fills with correct increase/reduce/cross-zero accounting. No streaming attribution service. |
 | 13 | **Crypto trading — must be retained** | **Good** | **Good** | `backend/cryptodesk` (12.9k LOC) and `frontend/src/cryptodesk` (9k LOC) **untouched**. Verified by `verify_crypto.py` still passing. |
 | 14 | Portfolio management | **Good** | **Good** | Markowitz, efficient frontier, risk parity, attribution, stress. |
-| 15 | Enterprise UI/UX | Partial | **Good** | Command palette (⌘K, fuzzy), light/dark theme on CSS tokens, virtualised sortable/filterable table with CSV export, Trading Desk with ladder + ticket + blotter + FIX monitor. Still missing: resizable panels, saved workspaces, WebSocket streaming (polling today). |
+| 15 | Enterprise UI/UX | Partial | **Good** | Command palette (⌘K, fuzzy), light/dark theme on CSS tokens, virtualised sortable/filterable table with CSV export, Trading Desk with ladder + ticket + blotter + FIX monitor, and **WebSocket streaming with reconnect, gap detection and a data-freshness indicator**. Still missing: resizable panels, saved workspaces. |
 | 16 | Observability / SRE | Partial | **Good** | Prometheus + Grafana, plus OpenTelemetry tracing correlated on ClOrdID and an X-Trace-Id response header. Opt-in via QGL_TRACING. |
 | 17 | Security / RBAC | **Absent** | **Good** | JWT + scrypt + four roles as separations of duty (trader cannot set limits, risk cannot trade, admin is not a superset). Opt-in via QGL_REQUIRE_AUTH; the ENABLED path is tested. Crypto desk keeps its wallet-signature auth. |
-| 18 | Testing | Partial | **Good** | 140 C++ (was 9), 228 Python (was 48), 16 frontend units (was 0), 5 property, 3 verifiers. Load/soak/failure-recovery still absent. |
-| 19 | Benchmark / performance lab | Partial | **Good** | Reproducible harness with environment capture, repetitions and spread, surfaced in a Performance Lab screen that cannot display a number the harness did not produce. |
+| 18 | Testing | Partial | **Good** | 155 C++ (was 9), 275 Python (was 48), 16 frontend units (was 0), 5 property, 3 verifiers. Load/soak/failure-recovery still absent. |
+| 19 | Benchmark / performance lab | Partial | **Good** | Throughput harness *and* a latency-distribution harness that measures the clock's own cost first and flags any result sitting at that floor. Surfaced in a Performance Lab screen that cannot display a number the harness did not produce. |
 | 20 | Institutional features | Partial | Partial | Kill switch, fat-finger, collars, position limits, halts, rate limiting added. Security master, reconciliation, EOD/SOD, model governance absent. |
 | 21 | Repository structure | Partial | Partial | `cpp/`, `backend/`, `frontend/`, `docs/`, `benchmarks/`, `observability/`. Not restructured into the `/services` + `/apps` layout the spec sketches. |
 | 22 | Incremental execution | — | **Done** | Version control established first; each increment built, tested and committed separately. |
@@ -43,14 +43,22 @@ overstated some things.
 
 |  | Before | After C++ core | Now |
 |---|---|---|---|
-| Good | 5 | 11 | 16 |
+| Good | 5 | 11 | 18 |
 | Partial | 9 | 8 | 4 |
-| Absent | 7 | 5 | 2 |
+| Absent | 7 | 5 | **0** |
 
-Remaining absences: **Kafka (§3)** and **Databricks/Delta Lake (§4)**. Both are
-blocked on the same thing — no broker and no Spark/Databricks workspace in this
-environment — and writing producers that have never connected to a broker
-produces the shape of correctness without the substance.
+No section is entirely absent. Two carry an explicit caveat rather than a clean
+bill:
+
+- **Kafka (§3).** The topic design, the bus contract and all the consumer
+  semantics are real and tested against the in-process implementation. The
+  `KafkaBus` transport itself has **never been run against a broker** — none
+  exists in this environment — and that is stated at the top of the file rather
+  than left to be discovered.
+- **Databricks (§4).** The medallion pipeline genuinely runs on real Delta tables
+  via delta-rs. What a Databricks workspace would add is a cluster, Unity Catalog
+  and distributed execution — none of which change the table format or the
+  pipeline shape.
 
 ## The five remaining absences, and what each actually requires
 

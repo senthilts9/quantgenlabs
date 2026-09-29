@@ -16,6 +16,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { T, ALPHA, MONO } from "../theme.js";
 import DataTable from "../components/DataTable.jsx";
+import useStream from "../hooks/useStream.js";
 
 const j = async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => null) });
 const post = (u, b) => fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b ?? {}) }).then(j);
@@ -275,6 +276,16 @@ export default function TradingDesk() {
 
   useEffect(() => { boot(); }, [boot]);
 
+  // The book is live between actions. Order responses still come over HTTP --
+  // an order is a request with a result, not a subscription -- but the ladder no
+  // longer waits for the next click to reflect the market.
+  const onFrame = useCallback((frame) => {
+    if (frame.kind !== "snapshot") return;
+    setSt((prev) => (prev ? { ...prev, ...frame.data } : prev));
+  }, []);
+  const stream = useStream(st ? `/api/stream/desk/${st.desk_id}?interval_ms=400` : null,
+                           { enabled: Boolean(st), onFrame });
+
   const send = async (body) => {
     if (!st) return;
     setBusy(true);
@@ -310,6 +321,15 @@ export default function TradingDesk() {
     <div>
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", marginBottom: 13 }}>
         <Pill tone={st.connected ? T.teal : T.red}>{st.connected ? "FIX session active" : "disconnected"}</Pill>
+        <Pill tone={stream.connected ? T.teal : stream.status === "connecting" ? T.amber : T.red}>
+          stream {stream.status}
+        </Pill>
+        {stream.msSinceFrame != null && (
+          <Pill tone={stream.msSinceFrame > 3000 ? T.amber : T.dim}>
+            {stream.msSinceFrame < 1000 ? "live" : `${(stream.msSinceFrame / 1000).toFixed(0)}s old`}
+          </Pill>
+        )}
+        {stream.gaps > 0 && <Pill tone={T.amber}>{stream.gaps} frame gaps</Pill>}
         <Pill tone={T.teal}>impl: {st.impl}</Pill>
         <Pill tone={T.amber}>simulated</Pill>
         <Pill>desk {st.desk_id}</Pill>
