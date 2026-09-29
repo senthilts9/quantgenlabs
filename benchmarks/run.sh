@@ -54,6 +54,11 @@ else
   rm -f "$OUT/results-avx2.json"
 fi
 
+echo "==> building latency harness"
+$CXX "${COMMON[@]}" "$ROOT/cpp/src/lat_bench.cpp" -o /tmp/qgl_lat_bench
+echo "==> running latency distribution (this one paces itself; it takes a minute)"
+/tmp/qgl_lat_bench "$((PATHS / 60))" > "$OUT/results-latency.json"
+
 echo "==> done:"
 ls -la "$OUT"/results-*.json
 python3 - "$OUT" <<'PY'

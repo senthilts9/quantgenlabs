@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "kind": "latency_distribution",
+  "units": "nanoseconds per operation",
+  "iterations": 300000,
+  "clock_overhead_ns": {"p50": 43, "p99": 45, "mean": 42.8},
+  "clock_overhead_note": "Cost of reading the monotonic clock, measured not assumed. Any figure at or below this floor is NOT a measurement of the code under test -- it is the timer.",
+  "measurements": [
+    {"name": "book.upsert", "n": 300000, "min": 67, "p50": 72, "p90": 90, "p99": 126, "p999": 156, "p9999": 415, "max": 113826, "mean": 79.8, "stddev": 401.4, "p99_over_p50": 1.75, "p999_over_p50": 2.17, "at_timer_floor": false, "note": "one level update, the operation a feed handler performs most"},
+    {"name": "book.top_of_book", "n": 300000, "min": 43, "p50": 46, "p90": 48, "p99": 64, "p999": 67, "p9999": 161, "max": 188871, "mean": 48.7, "stddev": 377.0, "p99_over_p50": 1.39, "p999_over_p50": 1.46, "at_timer_floor": true, "note": "the most frequently called read in the system"},
+    {"name": "book.depth_10", "n": 300000, "min": 46, "p50": 49, "p90": 50, "p99": 61, "p999": 76, "p9999": 1015, "max": 112069, "mean": 51.5, "stddev": 334.2, "p99_over_p50": 1.24, "p999_over_p50": 1.55, "at_timer_floor": true, "note": "10-level snapshot into caller storage, no allocation"},
+    {"name": "feed.validate", "n": 300000, "min": 85, "p50": 88, "p90": 89, "p99": 91, "p999": 114, "p9999": 218, "max": 103846, "mean": 89.4, "stddev": 271.6, "p99_over_p50": 1.03, "p999_over_p50": 1.30, "at_timer_floor": false, "note": "sequence + timestamp + band + EWMA outlier check"},
+    {"name": "risk.pretrade_check", "n": 300000, "min": 50, "p50": 53, "p90": 54, "p99": 55, "p999": 62, "p9999": 104, "max": 423424, "mean": 55.2, "stddev": 804.7, "p99_over_p50": 1.04, "p999_over_p50": 1.17, "at_timer_floor": true, "note": "kill switch -> limits -> collar -> position, full gate"},
+    {"name": "fix.encode_nos", "n": 150000, "min": 172, "p50": 187, "p90": 203, "p99": 246, "p999": 348, "p9999": 10387, "max": 168020, "mean": 194.8, "stddev": 629.5, "p99_over_p50": 1.32, "p999_over_p50": 1.86, "at_timer_floor": false, "note": "NewOrderSingle, 11 fields, BodyLength + CheckSum computed"},
+    {"name": "fix.parse_validated", "n": 150000, "min": 396, "p50": 401, "p90": 404, "p99": 420, "p999": 674, "p9999": 31810, "max": 78585, "mean": 411.0, "stddev": 594.7, "p99_over_p50": 1.05, "p999_over_p50": 1.68, "at_timer_floor": false, "note": "full validation: BodyLength + CheckSum, what a real engine pays"},
+    {"name": "fix.parse_trusted", "n": 150000, "min": 365, "p50": 370, "p90": 373, "p99": 647, "p999": 758, "p9999": 29441, "max": 155030, "mean": 388.4, "stddev": 713.2, "p99_over_p50": 1.75, "p999_over_p50": 2.05, "at_timer_floor": false, "note": "framing trusted -- only legitimate replaying a trusted log"},
+    {"name": "tick_to_order", "n": 150000, "min": 197, "p50": 212, "p90": 346, "p99": 396, "p999": 8163, "p9999": 58865, "max": 687128, "mean": 282.1, "stddev": 2482.3, "p99_over_p50": 1.87, "p999_over_p50": 38.50, "at_timer_floor": false, "note": "validate -> book -> top-of-book -> pre-trade -> encode. NO network, NO kernel, NO venue."},
+    {"name": "handoff.spsc_lockfree", "n": 47500, "min": 59, "p50": 119, "p90": 131, "p99": 166, "p999": 203, "p9999": 11292, "max": 1419769, "mean": 143.4, "stddev": 6516.5, "p99_over_p50": 1.39, "p999_over_p50": 1.71, "at_timer_floor": false, "note": "one message across an EMPTY queue. Cache-line separated indices, acquire/release, cached opposite index."},
+    {"name": "handoff.spsc_false_shared", "n": 47500, "min": 61, "p50": 154, "p90": 166, "p99": 180, "p999": 244, "p9999": 36619, "max": 121201, "mean": 138.9, "stddev": 779.5, "p99_over_p50": 1.17, "p999_over_p50": 1.58, "at_timer_floor": false, "note": "IDENTICAL logic, indices packed into ONE cache line -- the measured cost of false sharing."},
+    {"name": "handoff.mutex_condvar", "n": 47500, "min": 186, "p50": 4772, "p90": 8328, "p99": 9863, "p999": 131744, "p9999": 9539587, "max": 137193231, "mean": 10436.1, "stddev": 651418.5, "p99_over_p50": 2.07, "p999_over_p50": 27.61, "at_timer_floor": false, "note": "std::queue + mutex + condition_variable, paced identically. The wake-up is a syscall and the tail is a scheduling quantum."}
+  ],
+  "environment_note": "In-process, single machine, general-purpose kernel. NO CPU pinning, NO isolated cores, NO tickless mode, NO hugepages, NO kernel-bypass networking. A real low-latency deployment controls all of those. Read it this way: the p50 describes the code, the tail describes this host.",
+  "tail_note": "p99_over_p50 is the number to read first. A ratio near 1 is a predictable path; a large one means the median is not describing the system's behaviour.",
+  "sink_guard": 1
+}

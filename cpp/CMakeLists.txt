@@ -13,7 +13,7 @@ target_include_directories(engines INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include
 
 find_package(Threads REQUIRED)
 
-foreach(bench quant_bench parallel_bench lsm_bench ns_bench mkt_bench lifecycle_demo)
+foreach(bench quant_bench parallel_bench lsm_bench ns_bench mkt_bench lat_bench lifecycle_demo)
   add_executable(${bench} src/${bench}.cpp)
   target_link_libraries(${bench} PRIVATE engines Threads::Threads)
 endforeach()
@@ -40,7 +40,7 @@ endif()
 enable_testing()
 foreach(t engine_tests:test_engines book_tests:test_book feed_tests:test_feed
          fix_tests:test_fix fix_session_tests:test_fix_session
-         pretrade_tests:test_pretrade matching_tests:test_matching fix_venue_tests:test_fix_venue desk_tests:test_desk)
+         pretrade_tests:test_pretrade matching_tests:test_matching fix_venue_tests:test_fix_venue desk_tests:test_desk lat_tests:test_lat)
   string(REPLACE ":" ";" _pair ${t})
   list(GET _pair 0 _target)
   list(GET _pair 1 _src)

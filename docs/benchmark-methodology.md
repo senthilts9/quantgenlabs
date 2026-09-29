@@ -162,6 +162,85 @@ Prefer `fix_parse_validated` in any comparison: it is the figure a real engine
 pays. Skipping BodyLength and CheckSum is only legitimate when replaying a log
 whose framing is already trusted.
 
+## Latency distribution (the HFT question)
+
+Everything above is **throughput**. Throughput is the right measure for a batch
+job and the wrong one for a trading path, because it hides the number that decides
+whether a system is usable: the tail.
+
+A path that averages 200ns with a p99.9 of 50µs is not a 200ns path. It misses one
+message in a thousand by a margin that loses the trade — and a mean cannot see it,
+because one 50µs sample among a thousand 200ns samples moves the mean by 50ns,
+which looks like noise. `cpp/src/lat_bench.cpp` measures the distribution:
+
+```bash
+./benchmarks/run.sh          # runs it; writes benchmarks/results-latency.json
+```
+
+### The measurement floor comes first
+
+Reading the monotonic clock on this host costs **p50 43ns, p99 59ns**. That is the
+same order as the operations being timed, so the harness measures it first and
+flags any result whose p50 sits within 25% of it as `at_timer_floor: true`.
+
+Three of the twelve measurements are flagged. **They are not measurements of the
+code — they are measurements of the timer**, and they are reported that way rather
+than quoted as sub-50ns achievements.
+
+### Measured, 300,000 iterations, nanoseconds per operation
+
+| Operation | p50 | p99 | p99.9 | p99/p50 | |
+|---|---|---|---|---|---|
+| `book.top_of_book` | 46 | 65 | 68 | 1.4× | **at timer floor** |
+| `book.depth_10` | 49 | 70 | 75 | 1.4× | **at timer floor** |
+| `risk.pretrade_check` | 53 | 55 | 70 | 1.0× | **at timer floor** |
+| `book.upsert` | 72 | 114 | 143 | 1.6× | |
+| `feed.validate` | 87 | 91 | 110 | 1.1× | |
+| `fix.encode_nos` | 184 | 208 | 285 | 1.1× | |
+| **`tick_to_order`** | **209** | **240** | **329** | **1.1×** | full path |
+| `fix.parse_trusted` | 344 | 363 | 608 | 1.1× | |
+| `fix.parse_validated` | 379 | 393 | 682 | 1.0× | |
+
+`tick_to_order` is validate → book update → top-of-book read → pre-trade risk →
+encode `NewOrderSingle`. **209ns p50, 329ns p99.9.** No network, no kernel, no
+venue — those dominate real wire-to-wire latency and are not being claimed here.
+
+**Read `p99/p50` first.** Every in-process path is between 1.0× and 1.6×, which
+says the median is describing the system rather than hiding a tail behind it.
+
+### Cross-thread handoff — why a mutex is the wrong primitive
+
+One message across an **empty** queue, producer paced so nothing queues:
+
+| Mechanism | p50 | p99 | p99.9 |
+|---|---|---|---|
+| Lock-free SPSC ring | **125 ns** | 158 ns | **172 ns** |
+| Same ring, indices sharing one cache line | 144 ns | 158 ns | 165 ns |
+| `std::queue` + mutex + condvar | 4,953 ns | 10,096 ns | **113,504 ns** |
+
+The p50 gap is 40×. **The p99.9 gap is 660×** — and that is the real argument. A
+mutex is not merely slower on average: its tail is unbounded, because the wake-up
+is a syscall and a producer descheduled while holding the lock stops the consumer
+for a whole scheduling quantum. That is the p99.9 nobody can explain afterwards.
+
+False sharing costs ~15% at p50 here. That is smaller than it would be on a bigger
+machine — this host has 2 physical cores sharing one L3, so the line ping-pong is
+cheap. Reported as measured rather than as the dramatic number it becomes across
+sockets.
+
+### A measurement bug worth recording
+
+The first version of the handoff benchmark ran the producer flat out and
+timestamped at push. It reported **~29µs for the lock-free ring and ~18ms for the
+mutex queue**. Both were real numbers and neither meant what the label said: the
+producer fills a 4,096-slot ring far faster than the consumer drains it, so each
+sample included the wait behind thousands of predecessors. That measures
+**queueing delay under saturation**, not handoff cost.
+
+Handoff latency is only defined when the queue is not backed up, so the producer
+now waits for each message to be taken before sending the next. The corrected
+figures are the ones above.
+
 ## What these numbers are not
 
 - **Not wire-to-wire latency.** The end-to-end path excludes network, kernel and
@@ -170,8 +249,12 @@ whose framing is already trusted.
 - **Not production-tuned.** Measured on a loaded desktop OS with no CPU pinning,
   no isolated cores, no hugepages and no kernel-bypass networking. Treat them as
   relative comparisons between implementations on one host.
-- **Not a latency distribution.** These are throughput medians. P99/P99.9 tail
-  latency under load is a different measurement and is not claimed here.
+- **Latency and throughput are separate sections**, measured by separate harnesses,
+  and neither figure should be quoted as the other.
+- **The tails describe this host, not the code.** No CPU pinning, no isolated
+  cores, no tickless kernel, no hugepages, no kernel-bypass NIC. A real
+  low-latency deployment controls all four. The honest reading: **p50 tells you
+  about the code, the tail tells you about this machine.**
 
 The reason to prefer `fix_parse_validated` over `fix_parse_unvalidated` in any
 comparison is that the validated figure is the one a real engine pays: skipping

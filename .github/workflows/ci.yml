@@ -22,10 +22,16 @@ jobs:
           # connectivity path, so if it stops working the composition is broken even
           # if every unit test still passes.
           g++ -std=c++20 -O2 -Wall -Wextra -pthread -Icpp/include cpp/src/lifecycle_demo.cpp -o /tmp/lifecycle_demo && /tmp/lifecycle_demo > /dev/null
+          # Latency harness: built and smoke-run. Like the throughput harness, its
+          # NUMBERS from CI are not published -- shared runners are throttled and a
+          # tail figure from one is meaningless.
+          g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/lat_bench.cpp -o /tmp/lat_bench
+          /tmp/lat_bench 5000 > /tmp/lat.json
+          python3 -c "import json;d=json.load(open('/tmp/lat.json'));assert d['kind']=='latency_distribution';assert d['clock_overhead_ns']['p50']>=0;print('latency JSON valid')"
           g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/mkt_bench.cpp -o /tmp/mkt_bench
           /tmp/mkt_bench 200000 1 > /tmp/bench.json
           python3 -c "import json;d=json.load(open('/tmp/bench.json'));assert d['schema_version']==1;assert d['monte_carlo']['timesteps_per_path']==1;print('bench JSON valid')"
-          for t in test_engines test_book test_feed test_fix test_fix_session test_pretrade test_matching test_fix_venue test_desk; do
+          for t in test_engines test_book test_feed test_fix test_fix_session test_pretrade test_matching test_fix_venue test_desk test_lat; do
             g++ -std=c++20 -O2 -Wall -Wextra -pthread -Icpp/include -Icpp/tests cpp/tests/$t.cpp -o /tmp/$t && /tmp/$t
           done
   python:
