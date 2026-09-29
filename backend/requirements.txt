@@ -23,3 +23,7 @@ psycopg[binary]>=3.1
 # tests run against a REAL Postgres with no Docker and no system install. Test
 # dependency only; nothing imports it at runtime.
 pgserver>=0.1.4
+# JWT for the institutional-side auth layer. Not hand-rolled: algorithm-confusion
+# defences and expiry validation are exactly the things a hand-rolled verifier
+# gets subtly wrong, and a signature bug is a silent acceptance, not a crash.
+pyjwt>=2.8

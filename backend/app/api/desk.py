@@ -24,10 +24,11 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..core import connectivity as conn
+from ..core.auth import Permission, require
 
 router = APIRouter(prefix="/api/desk", tags=["trading desk"])
 
@@ -123,7 +124,8 @@ class SessionRequest(BaseModel):
     tick_size: float = Field(0.01, gt=0, le=1000)
 
 
-@router.post("/session")
+@router.post("/session",
+             dependencies=[Depends(require(Permission.SUBMIT_ORDER))])
 def create_session(req: SessionRequest) -> dict:
     _require_cpp()
     import mkt_connectivity as mc
@@ -182,7 +184,8 @@ class OrderRequest(BaseModel):
     cl_ord_id: str | None = None
 
 
-@router.post("/{desk_id}/order")
+@router.post("/{desk_id}/order",
+             dependencies=[Depends(require(Permission.SUBMIT_ORDER))])
 def submit_order(desk_id: str, req: OrderRequest) -> dict:
     _require_cpp()
     s = _get(desk_id)
@@ -210,7 +213,8 @@ class CancelRequest(BaseModel):
     orig_cl_ord_id: str = Field(..., min_length=1, max_length=64)
 
 
-@router.post("/{desk_id}/cancel")
+@router.post("/{desk_id}/cancel",
+             dependencies=[Depends(require(Permission.CANCEL_ORDER))])
 def cancel_order(desk_id: str, req: CancelRequest) -> dict:
     _require_cpp()
     s = _get(desk_id)

@@ -21,10 +21,11 @@ import json
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..core import connectivity as conn
+from ..core.auth import Permission, require
 
 router = APIRouter(prefix="/api/connectivity", tags=["connectivity"])
 
@@ -213,7 +214,8 @@ class PreTradeRequest(BaseModel):
     kill_switch: bool = False
 
 
-@router.post("/pretrade")
+@router.post("/pretrade",
+             dependencies=[Depends(require(Permission.READ_RISK))])
 def pretrade(req: PreTradeRequest) -> dict:
     if not conn.HAVE_CPP:
         raise HTTPException(
