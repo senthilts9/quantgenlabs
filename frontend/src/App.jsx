@@ -21,6 +21,7 @@ import { T, MONO } from "./theme.js";
 import PerformanceLab from "./screens/PerformanceLab.jsx";
 import ConnectivityScreen from "./screens/Connectivity.jsx";
 import TradingDesk from "./screens/TradingDesk.jsx";
+import CommandPalette, { useCommandPalette } from "./components/CommandPalette.jsx";
 
 /* ================================================================== *
  *  QuantGenLabs — Risk & Quant Console (full shell)
@@ -185,6 +186,10 @@ export default function Console() {
     })();
   }, []);
   const flat = NAV.flatMap((n) => n.items || [n]);
+  // Same list, annotated with its group, for the command palette.
+  const paletteItems = NAV.flatMap((n) =>
+    n.items ? n.items.map((it) => ({ ...it, group: n.group })) : [{ ...n }]);
+  const [paletteOpen, setPaletteOpen] = useCommandPalette();
   const active = flat.find((i) => i.id === view);
   const go = (id) => { setView(id); setNavOpen(false); };  // close on select
   return (
@@ -215,9 +220,17 @@ export default function Console() {
           <button className="navtoggle" onClick={() => setNavOpen((v) => !v)}
             aria-label="Toggle navigation" aria-expanded={navOpen} style={S.iconBtn}>☰</button>
           <span style={{ color: T.dim, fontSize: 12, whiteSpace: "nowrap" }}>{active?.label}</span>
-          <div style={S.searchWrap} className="searchwrap"><Search size={14} color={T.dim} />
-            <input placeholder="Search instruments, models, commands…" style={S.search} />
-            <span style={S.kbd} className="kbd"><Command size={11} /> K</span></div>
+          {/* Was a dead <input> with a ⌘K chip beside it and no handler at all.
+              A control that advertises a shortcut it does not implement teaches
+              people the UI lies, so it is now a real button opening a real
+              palette. */}
+          <button type="button" onClick={() => setPaletteOpen(true)}
+            aria-label="Open command palette" aria-keyshortcuts="Meta+K Control+K"
+            style={{ ...S.searchWrap, cursor: "pointer", textAlign: "left" }} className="searchwrap">
+            <Search size={14} color={T.dim} />
+            <span style={{ ...S.search, color: T.faint }}>Jump to a screen…</span>
+            <span style={S.kbd} className="kbd"><Command size={11} /> K</span>
+          </button>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
             <span className="ctxwrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Ctx k="Books" v={ctx ? `${ctx.books} · ${ctx.positions} pos` : "—"} />
@@ -260,6 +273,13 @@ export default function Console() {
         </main>
         <ConsoleFooter />
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        items={paletteItems}
+        onSelect={go}
+        current={view}
+      />
     </div>
   );
 }
