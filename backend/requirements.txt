@@ -27,3 +27,10 @@ pgserver>=0.1.4
 # defences and expiry validation are exactly the things a hand-rolled verifier
 # gets subtly wrong, and a signature bug is a silent acceptance, not a crash.
 pyjwt>=2.8
+
+# Distributed tracing (OPT-IN via QGL_TRACING). Complements the Prometheus
+# metrics rather than replacing them: metrics answer "how many/how fast", a trace
+# answers "what happened to THIS order".
+opentelemetry-sdk>=1.24
+opentelemetry-instrumentation-fastapi>=0.45b0
+opentelemetry-exporter-otlp-proto-http>=1.24

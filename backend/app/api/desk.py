@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from ..core import connectivity as conn
 from ..core.auth import Permission, require
+from ..obs import tracing
 
 router = APIRouter(prefix="/api/desk", tags=["trading desk"])
 
@@ -196,8 +197,16 @@ def submit_order(desk_id: str, req: OrderRequest) -> dict:
         s.seq += 1
         cl = req.cl_ord_id or f"QGL-{s.seq:04d}"
         before = len(s.desk.wire_log(0))
-        s.desk.submit(cl, req.symbol, req.side, req.qty, req.price,
-                      req.ord_type, req.tif, _now_ns(s))
+        # ClOrdID is the correlation key: it is already in the blotter, the FIX
+        # wire log and the audit trail, so a trace found by it is a trace someone
+        # can actually find.
+        tracing.set_correlation(cl_ord_id=cl, symbol=req.symbol)
+        with tracing.span("desk.submit_order", **{
+            "qgl.cl_ord_id": cl, "qgl.symbol": req.symbol, "qgl.side": req.side,
+            "qgl.qty": float(req.qty), "qgl.ord_type": req.ord_type, "qgl.tif": req.tif,
+        }):
+            s.desk.submit(cl, req.symbol, req.side, req.qty, req.price,
+                          req.ord_type, req.tif, _now_ns(s))
         st = _state(desk_id, s)
         # The messages THIS order produced, so the UI can show the exchange that
         # just happened rather than the whole session history.

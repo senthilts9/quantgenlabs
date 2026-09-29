@@ -28,6 +28,7 @@ from .api import (auth, connectivity, desk, bench, cryptodesk, cryptodesk_auth, 
                   observability, oms, dex_board, portfolio, pricing,
                   quanthub, rates, risk, sor, tca)
 from .core import crypto
+from .obs import tracing
 from .services.copilot import router as copilot_router
 from .services import (crypto_quotes, engine_calibration, heartbeat,
                        warm_board)
@@ -51,10 +52,25 @@ async def instrument(request: Request, call_next):
     HTTP_LATENCY.labels(request.method, path, str(response.status_code)).observe(
         time.perf_counter() - t0)
     response.headers["X-Process-Time-ms"] = f"{(time.perf_counter()-t0)*1000:.2f}"
+    # Returning the trace id means a slow or failed request carries the handle
+    # needed to look it up, instead of requiring someone to search by timestamp.
+    tid = tracing.current_trace_id()
+    if tid:
+        response.headers["X-Trace-Id"] = tid
     return response
 
 
 app.mount("/metrics", make_asgi_app())
+
+# Tracing is opt-in (QGL_TRACING) and degrades to disabled on any import failure:
+# telemetry that can take the service down is a liability, not an asset.
+tracing.setup(app)
+
+
+@app.on_event("shutdown")
+def _stop_tracing() -> None:
+    # Flush spans in flight rather than losing them with the process.
+    tracing.shutdown()
 
 # --- core routers (pricing / risk / observability) ---
 app.include_router(pricing.router)
