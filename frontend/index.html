@@ -5,6 +5,31 @@
 <meta name="description" content="Cryptolabs — institutional risk & quant console: cross-asset market data, OMS, VaR/ES, FRM measures, C++ pricing engines." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1420'/%3E%3Crect x='4' y='4' width='56' height='56' rx='12' fill='none' stroke='%232DD4BF' stroke-width='3'/%3E%3Cpath d='M14 42 L24 30 L32 36 L42 20 L50 26' fill='none' stroke='%232DD4BF' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='42' cy='20' r='4.5' fill='%2338BDF8'/%3E%3C/svg%3E" />
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230E1420'/%3E%3Crect x='4' y='4' width='56' height='56' rx='12' fill='none' stroke='%232DD4BF' stroke-width='3'/%3E%3Cpath d='M14 42 L24 30 L32 36 L42 20 L50 26' fill='none' stroke='%232DD4BF' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='42' cy='20' r='4.5' fill='%2338BDF8'/%3E%3C/svg%3E" />
-<title>Cryptolabs — Risk &amp; Quant Console</title></head>
-<body style="margin:0;background:#0E1420"><div id="root"></div>
+<title>Cryptolabs — Risk &amp; Quant Console</title>
+<!-- The theme tokens are defined here as well as in the bundle so the page has a
+     background BEFORE any JavaScript runs. Without this the body was styled with
+     a literal #0E1420 inline, which beat every stylesheet and left the light
+     theme with a dark background. -->
+<style>
+  :root, [data-theme="dark"] { --qgl-bg:#0E1420; color-scheme: dark; }
+  [data-theme="light"] { --qgl-bg:#F4F6F9; color-scheme: light; }
+  html, body { margin:0; background: var(--qgl-bg); }
+</style>
+<script>
+  // Resolve the theme before first paint. Doing this in React instead produces a
+  // flash of the wrong theme on every load, because the bundle runs after the
+  // browser has already painted the body.
+  (function () {
+    try {
+      var saved = localStorage.getItem("qgl-theme");
+      var t = (saved === "light" || saved === "dark") ? saved
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      document.documentElement.setAttribute("data-theme", t);
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute("content", t === "light" ? "#F4F6F9" : "#0E1420");
+    } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+  })();
+</script>
+</head>
+<body><div id="root"></div>
 <script type="module" src="/src/main.jsx"></script></body></html>

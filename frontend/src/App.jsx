@@ -3,7 +3,7 @@ import {
   LayoutGrid, Activity, Sigma, TriangleAlert, ShieldCheck, LineChart as LineIcon,
   Layers, Briefcase, Gauge, Coins, History, Database, Bot,
   BookOpen, Search, Command, Circle, ArrowUpRight, ArrowDownRight, Cpu, Zap,
-  CheckCircle2, ChevronRight, Router, Split,
+  CheckCircle2, ChevronRight, Router, Split, Sun, Moon,
 } from "lucide-react";
 // Phase 1 digital-assets desk. Aliased because this file already defines a
 // `CryptoDesk` (the previous perps/AMM screen), which the new workspace
@@ -15,7 +15,7 @@ import "./cryptodesk/desk.css";
 import "./cryptodesk/dexboard.css";
 // Palette lives in theme.js so screens in their own modules share these exact
 // tokens instead of a hand-copied duplicate that drifts a shade at a time.
-import { T, MONO } from "./theme.js";
+import { T, MONO, THEME_CSS, initialTheme, applyTheme } from "./theme.js";
 // Market-connectivity screens. Kept in their own modules because App.jsx is
 // already 4k lines; they share the palette via theme.js rather than a copy.
 import PerformanceLab from "./screens/PerformanceLab.jsx";
@@ -190,6 +190,10 @@ export default function Console() {
   const paletteItems = NAV.flatMap((n) =>
     n.items ? n.items.map((it) => ({ ...it, group: n.group })) : [{ ...n }]);
   const [paletteOpen, setPaletteOpen] = useCommandPalette();
+  // Theme lives on <html>, not in React state that every styled node reads: the
+  // tokens are CSS variables, so switching is a repaint rather than a re-render.
+  const [theme, setTheme] = useState(initialTheme);
+  useEffect(() => { applyTheme(theme); }, [theme]);
   const active = flat.find((i) => i.id === view);
   const go = (id) => { setView(id); setNavOpen(false); };  // close on select
   return (
@@ -236,6 +240,12 @@ export default function Console() {
               <Ctx k="Books" v={ctx ? `${ctx.books} · ${ctx.positions} pos` : "—"} />
               <Ctx k="Marks as-of" v={ctx?.asOf || "live + EOD"} />
               <Ctx k="Base" v="USD" /></span>
+            <button type="button" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              style={{ ...S.iconBtn, display: "grid", placeItems: "center", width: 28, height: 28 }}>
+              {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
             <span style={S.sim}>SIMULATED · NOT PRODUCTION</span></div>
         </header>
         <main style={S.canvas}>
@@ -4273,6 +4283,7 @@ const S = {
   sendBtn: { background: T.teal, color: T.bg, border: "none", borderRadius: 8, padding: "0 16px", fontWeight: 600, cursor: "pointer", fontSize: 13 },
 };
 const CSS = `
+${THEME_CSS}
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 *{box-sizing:border-box}
 ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:${T.line};border-radius:6px}::-webkit-scrollbar-track{background:transparent}

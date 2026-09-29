@@ -63,6 +63,16 @@ jobs:
         with: { node-version: "20" }
       - run: cd frontend && npm install && npm run build
 
+  frontend-units:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm --prefix frontend ci || npm --prefix frontend install
+      - name: Unit tests (sorting, CSV escaping, fuzzy matching)
+        run: npm --prefix frontend test
+
   deploy-artifacts:
     runs-on: ubuntu-latest
     steps:

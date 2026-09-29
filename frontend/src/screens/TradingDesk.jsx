@@ -14,7 +14,8 @@
  * response and the screen repeats it.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { T, MONO } from "../theme.js";
+import { T, ALPHA, MONO } from "../theme.js";
+import DataTable from "../components/DataTable.jsx";
 
 const j = async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => null) });
 const post = (u, b) => fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b ?? {}) }).then(j);
@@ -77,7 +78,7 @@ function Ladder({ book, onPick }) {
             return (
               <tr key={i}>
                 <td style={{ padding: "3px 8px", textAlign: "right", color: T.dim, position: "relative" }}>
-                  {b && <span style={{ position: "absolute", right: 0, top: 2, bottom: 2, width: `${(b.qty / maxQ) * 70}%`, background: `${T.green}14` }} />}
+                  {b && <span style={{ position: "absolute", right: 0, top: 2, bottom: 2, width: `${(b.qty / maxQ) * 70}%`, background: ALPHA.green }} />}
                   <span style={{ position: "relative" }}>{b ? qty(b.qty) : ""}</span>
                 </td>
                 <td onClick={() => b && onPick(b.price)} title={b ? "Use this price" : undefined}
@@ -89,7 +90,7 @@ function Ladder({ book, onPick }) {
                   {a ? n2(a.price) : ""}
                 </td>
                 <td style={{ padding: "3px 8px", color: T.dim, position: "relative" }}>
-                  {a && <span style={{ position: "absolute", left: 0, top: 2, bottom: 2, width: `${(a.qty / maxQ) * 70}%`, background: `${T.red}14` }} />}
+                  {a && <span style={{ position: "absolute", left: 0, top: 2, bottom: 2, width: `${(a.qty / maxQ) * 70}%`, background: ALPHA.red }} />}
                   <span style={{ position: "relative" }}>{a ? qty(a.qty) : ""}</span>
                 </td>
               </tr>
@@ -167,56 +168,66 @@ function Ticket({ onSend, busy, price, setPrice }) {
 }
 
 /* ----------------------------------------------------------------- blotter */
+/* Uses the shared DataTable: virtualised, so a blotter that grows through a
+ * session stays responsive, plus sort, filter and CSV export for free. */
 function Blotter({ rows, onCancel, selected, onSelect }) {
-  if (!rows?.length) return <div style={{ color: T.faint, fontSize: 11.5 }}>No orders yet.</div>;
-  const th = { padding: "5px 8px", color: T.faint, fontSize: 9, letterSpacing: 0.8, textTransform: "uppercase", borderBottom: `1px solid ${T.line}`, whiteSpace: "nowrap" };
-  const td = { padding: "5px 8px", borderBottom: `1px solid ${T.lineSoft}`, fontFamily: MONO, fontSize: 11.5, whiteSpace: "nowrap" };
+  const columns = [
+    { key: "cl_ord_id", header: "ClOrdID", width: "15%", mono: true,
+      tone: (r) => (r.cl_ord_id === selected ? T.teal : T.text) },
+    { key: "side", header: "Side", width: "7%",
+      raw: (r) => (r.side === "1" ? "BUY" : "SELL"),
+      render: (r) => (r.side === "1" ? "BUY" : "SELL"),
+      tone: (r) => (r.side === "1" ? T.green : T.red) },
+    { key: "order_qty", header: "Qty", width: "9%", align: "right",
+      raw: (r) => r.order_qty, render: (r) => qty(r.order_qty) },
+    { key: "limit_price", header: "Limit", width: "9%", align: "right",
+      raw: (r) => (r.ord_type === "1" ? null : r.limit_price),
+      render: (r) => (r.ord_type === "1" ? "MKT" : n2(r.limit_price)),
+      tone: () => T.dim },
+    { key: "tif", header: "TIF", width: "6%",
+      raw: (r) => r.tif,
+      render: (r) => ({ "0": "DAY", "3": "IOC", "4": "FOK" }[r.tif] ?? r.tif),
+      tone: () => T.dim },
+    { key: "status", header: "Status (39)", width: "13%",
+      tone: (r) => STATUS_TONE[r.status] || T.text },
+    { key: "cum_qty", header: "Cum", width: "8%", align: "right",
+      raw: (r) => r.cum_qty, render: (r) => qty(r.cum_qty) },
+    { key: "leaves_qty", header: "Leaves", width: "8%", align: "right",
+      raw: (r) => r.leaves_qty, render: (r) => qty(r.leaves_qty), tone: () => T.dim },
+    { key: "avg_px", header: "Avg px", width: "9%", align: "right",
+      raw: (r) => (r.cum_qty > 0 ? r.avg_px : null),
+      render: (r) => (r.cum_qty > 0 ? n2(r.avg_px) : "—") },
+    { key: "actions", header: "", width: "16%", align: "right", mono: false,
+      raw: (r) => r.reject_text || "",
+      render: (r) => {
+        const live = r.status === "new" || r.status === "partially_filled";
+        if (live) {
+          return (
+            <button onClick={(e) => { e.stopPropagation(); onCancel(r.cl_ord_id); }}
+              style={{ background: "none", border: `1px solid ${T.amber}`, color: T.amber,
+                       borderRadius: 5, padding: "1px 7px", fontSize: 10, cursor: "pointer" }}>
+              cancel
+            </button>
+          );
+        }
+        return r.reject_text
+          ? <span title={r.reject_text} style={{ color: T.red, fontSize: 10 }}>{r.reject_text.slice(0, 20)}</span>
+          : null;
+      } },
+  ];
+
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 660 }}>
-        <thead><tr>
-          <th style={{ ...th, textAlign: "left" }}>ClOrdID</th>
-          <th style={{ ...th, textAlign: "left" }}>Side</th>
-          <th style={{ ...th, textAlign: "right" }}>Qty</th>
-          <th style={{ ...th, textAlign: "right" }}>Limit</th>
-          <th style={{ ...th, textAlign: "left" }}>Status (39)</th>
-          <th style={{ ...th, textAlign: "right" }}>Cum</th>
-          <th style={{ ...th, textAlign: "right" }}>Leaves</th>
-          <th style={{ ...th, textAlign: "right" }}>Avg px</th>
-          <th style={{ ...th, textAlign: "right" }}>Fills</th>
-          <th style={th}></th>
-        </tr></thead>
-        <tbody>
-          {rows.map((r) => {
-            const on = selected === r.cl_ord_id;
-            const live = r.status === "new" || r.status === "partially_filled";
-            return (
-              <tr key={r.cl_ord_id} onClick={() => onSelect(r.cl_ord_id)}
-                  style={{ cursor: "pointer", background: on ? T.panel2 : "transparent" }}>
-                <td style={{ ...td, color: on ? T.teal : T.text }}>{r.cl_ord_id}</td>
-                <td style={{ ...td, color: r.side === "1" ? T.green : T.red }}>{r.side === "1" ? "BUY" : "SELL"}</td>
-                <td style={{ ...td, textAlign: "right" }}>{qty(r.order_qty)}</td>
-                <td style={{ ...td, textAlign: "right", color: T.dim }}>{r.ord_type === "1" ? "MKT" : n2(r.limit_price)}</td>
-                <td style={{ ...td, color: STATUS_TONE[r.status] || T.text }}>{r.status}</td>
-                <td style={{ ...td, textAlign: "right" }}>{qty(r.cum_qty)}</td>
-                <td style={{ ...td, textAlign: "right", color: T.dim }}>{qty(r.leaves_qty)}</td>
-                <td style={{ ...td, textAlign: "right" }}>{r.cum_qty > 0 ? n2(r.avg_px) : "—"}</td>
-                <td style={{ ...td, textAlign: "right", color: T.dim }}>{r.fills.length}</td>
-                <td style={{ ...td, textAlign: "right" }}>
-                  {live && (
-                    <button onClick={(e) => { e.stopPropagation(); onCancel(r.cl_ord_id); }}
-                            style={{ background: "none", border: `1px solid ${T.amber}`, color: T.amber, borderRadius: 5, padding: "1px 7px", fontSize: 10, cursor: "pointer" }}>
-                      cancel
-                    </button>
-                  )}
-                  {r.reject_text && <span title={r.reject_text} style={{ color: T.red, fontSize: 10 }}>{r.reject_text.slice(0, 18)}</span>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      rows={rows}
+      height={230}
+      rowKey={(r) => r.cl_ord_id}
+      selectedKey={selected}
+      onRowClick={(r) => onSelect(r.cl_ord_id)}
+      exportName="blotter"
+      empty="No orders yet."
+      dense
+    />
   );
 }
 

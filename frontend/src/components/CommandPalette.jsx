@@ -34,9 +34,14 @@ export function fuzzyScore(text, q) {
     last = at;
     ti = at + 1;
   }
-  // A word-boundary start is worth more than raw position, so "Risk Copilot"
-  // beats "Smart Order Routing" for "co" even though the hit is further in.
-  const boundary = first === 0 || /[\s&/·-]/.test(t[first - 1] || "") ? 0 : 3;
+  // A word-boundary start outranks raw position: someone typing "co" almost
+  // always means a word beginning "co", not the "co" inside "Reconciliation".
+  //
+  // The weight is 6 rather than 3 because 3 only ties against a three-character
+  // position difference -- "Risk Copilot" (hit at 5, on a boundary) and
+  // "Reconciliation" (hit at 2, mid-word) both scored 5, so the tie broke
+  // alphabetically and the wrong one won. A unit test caught that.
+  const boundary = first === 0 || /[\s&/·-]/.test(t[first - 1] || "") ? 0 : 6;
   return first + gaps * 2 + boundary;
 }
 
