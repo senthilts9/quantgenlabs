@@ -27,7 +27,23 @@ jobs:
           # tail figure from one is meaningless.
           g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/lat_bench.cpp -o /tmp/lat_bench
           /tmp/lat_bench 5000 > /tmp/lat.json
-          python3 -c "import json;d=json.load(open('/tmp/lat.json'));assert d['kind']=='latency_distribution';assert d['clock_overhead_ns']['p50']>=0;print('latency JSON valid')"
+          python3 -c "
+          import json; d = json.load(open('/tmp/lat.json'))
+          assert d['kind'] == 'latency_distribution'
+          # Both clocks are characterised now: adding RDTSC split the old single
+          # clock_overhead_ns into two, and nested them under 'timer'. CI kept
+          # asserting the old top-level key and failed on every commit.
+          t = d['timer']
+          assert t['clock_gettime_overhead_ns']['p50'] >= 0
+          assert t['tsc_overhead_ns']['p50'] >= 0
+          # The reason RDTSC was added at all. If this ever fails, the cheap
+          # timer is not cheap and the sub-100ns measurements are timer noise.
+          assert t['tsc_overhead_ns']['p50'] <= t['clock_gettime_overhead_ns']['p50'], \
+              'RDTSC is not cheaper than clock_gettime -- the measurements below ' \
+              'the clock floor cannot be trusted'
+          print('latency JSON valid; tsc p50=%s vs clock_gettime p50=%s'
+                % (t['tsc_overhead_ns']['p50'], t['clock_gettime_overhead_ns']['p50']))
+          "
           g++ -std=c++20 -O3 -Wall -Wextra -pthread -Icpp/include cpp/src/mkt_bench.cpp -o /tmp/mkt_bench
           /tmp/mkt_bench 200000 1 > /tmp/bench.json
           python3 -c "import json;d=json.load(open('/tmp/bench.json'));assert d['schema_version']==1;assert d['monte_carlo']['timesteps_per_path']==1;print('bench JSON valid')"
@@ -40,7 +56,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install numpy scipy fastapi pydantic prometheus-client pytest hypothesis pybind11 httpx
+      - run: pip install numpy scipy pandas fastapi pydantic prometheus-client pytest hypothesis pybind11 httpx
       # The relational, auth and tracing suites. pgserver ships real PostgreSQL
       # binaries as a wheel, so the repository tests run against an actual server
       # in CI with no service container to provision.
@@ -133,6 +149,12 @@ jobs:
           PY
 
       - name: Validate docker-compose
+        # The compose file declares GRAFANA_ADMIN_PASSWORD as required
+        # (${GRAFANA_ADMIN_PASSWORD:?...}) so that a real deploy cannot start
+        # Grafana on a default password. Validation still has to satisfy it;
+        # this value is a throwaway for `config --quiet` and reaches nothing.
+        env:
+          GRAFANA_ADMIN_PASSWORD: ci-validation-only
         run: docker compose -f docker-compose.yml config --quiet
       - name: Build the API image
         run: docker build -f deploy/Dockerfile.api -t qgl-api:ci .

@@ -8,7 +8,14 @@
 *.key
 
 # Runtime data — the OMS SQLite book, its WAL, and Prometheus/Grafana volumes.
-data/
+# ANCHORED with a leading slash. A bare `data/` matches a directory of that name
+# at ANY depth, and it silently swallowed frontend/src/cryptodesk/data/, which
+# holds mockData.ts — a SOURCE file the crypto desk imports. The result was a
+# repo that could not build the crypto desk from a clean checkout: it worked on
+# any machine that already had the file and failed in CI, which is exactly how
+# it went unnoticed.
+/backend/data/
+/data/
 *.db
 *.db-shm
 *.db-wal
