@@ -32,6 +32,12 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Backtest output. `python backend/run_backtest.py` writes these next to the
+# script; CI regenerates them every run. Ignored so `git add -A` cannot commit a
+# stale tearsheet -- the one in docs/ is the deliberate, versioned copy.
+backend/tearsheet.png
+backend/equity_curve.csv
+
 # Editor / OS
 .DS_Store
 .idea/
