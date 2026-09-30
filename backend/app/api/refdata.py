@@ -11,6 +11,22 @@ cannot be shared across callers who are each experimenting: one caller's SOD wou
 block another's. Sessions are capped and the cap is enforced, so the endpoint
 cannot be made to allocate without bound.
 
+AUTHENTICATION MATCHES THE REST OF THE READ SURFACE, WHICH IS TO SAY THERE IS
+NONE. The platform's convention is that only order-submitting POSTs carry a
+`require(Permission...)` guard -- /api/desk/order, /api/algo/start and the
+cancels. No GET anywhere is guarded, and neither is /api/connectivity/status or
+/api/events/topics. An earlier draft of this module guarded all seventeen routes;
+with QGL_REQUIRE_AUTH=true (which the production configmap sets) that made
+Reference Data the ONE screen returning 401 while every other screen worked,
+because the frontend sends no Authorization header anywhere.
+
+What is served here is a fixture security master, computed calendars and public
+corporate-action records -- no prices, no positions, no money. The batch cycle
+mutates only in-process session state that is explicitly labelled simulated, and
+a guard on those endpoints alone would break the panel while protecting nothing.
+Guarding them is the right call once the frontend carries a token; that is a
+platform-wide change, not a change to this module.
+
 EVERY DATE IS A REQUIRED PARAMETER. There is no as-of default of today anywhere in
 this module. A ticker resolved against whatever today happens to be is the wrong
 answer delivered confidently, and the point of the layer underneath is that it
@@ -22,10 +38,9 @@ import threading
 import uuid
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ..core.auth import Permission, require
 from ..core.refdata import (AmbiguousSymbol, DailyCycle, DailyCycleError,
                             Holding, IdType, Phase, Position, SymbologyError,
                             crypto_calendar, reconcile_cash,
@@ -67,7 +82,7 @@ def _cycle(session_id: str | None) -> tuple[str, DailyCycle]:
 
 
 # ---------------------------------------------------------------- symbology
-@router.get("/instruments", dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/instruments")
 def list_instruments(asset_class: str | None = None):
     out = []
     for i in SECURITY_MASTER.all_instruments():
@@ -89,7 +104,7 @@ def list_instruments(asset_class: str | None = None):
                     "their own check digits; nothing here is a price."}
 
 
-@router.get("/resolve", dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/resolve")
 def resolve(symbol: str = Query(..., min_length=1),
             on: date = Query(..., description="As-of date. Required, not defaulted: "
                                               "a ticker is only unique within a window."),
@@ -115,8 +130,7 @@ def resolve(symbol: str = Query(..., min_length=1),
     }
 
 
-@router.get("/lineage/{instrument_id}",
-            dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/lineage/{instrument_id}")
 def lineage(instrument_id: str, id_type: str = "ticker"):
     try:
         it = IdType(id_type)
@@ -135,7 +149,7 @@ def lineage(instrument_id: str, id_type: str = "ticker"):
     }
 
 
-@router.get("/validate", dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/validate")
 def validate(isin: str | None = None, cusip: str | None = None):
     if not isin and not cusip:
         raise HTTPException(422, "Pass isin or cusip.")
@@ -150,7 +164,7 @@ def validate(isin: str | None = None, cusip: str | None = None):
 
 
 # ----------------------------------------------------------------- calendar
-@router.get("/calendar/{mic}", dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/calendar/{mic}")
 def calendar_info(mic: str, on: date = Query(...)):
     cal = _calendar(mic)
     trading = cal.is_trading_day(on)
@@ -170,8 +184,7 @@ def calendar_info(mic: str, on: date = Query(...)):
     }
 
 
-@router.get("/calendar/{mic}/session",
-            dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/calendar/{mic}/session")
 def session_state(mic: str, at: datetime = Query(..., description="Exchange-LOCAL time.")):
     cal = _calendar(mic)
     st = cal.state_at(at)
@@ -180,8 +193,7 @@ def session_state(mic: str, at: datetime = Query(..., description="Exchange-LOCA
             "note": "Interpreted as exchange-local time, not UTC."}
 
 
-@router.get("/calendar/{mic}/days",
-            dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/calendar/{mic}/days")
 def trading_days(mic: str, start: date = Query(...), end: date = Query(...)):
     cal = _calendar(mic)
     if (end - start).days > 400:
@@ -197,8 +209,7 @@ def trading_days(mic: str, start: date = Query(...), end: date = Query(...)):
 
 
 # -------------------------------------------------------- corporate actions
-@router.get("/corporate-actions",
-            dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/corporate-actions")
 def corporate_actions(instrument_id: str | None = None,
                       start: date | None = None, end: date | None = None):
     if instrument_id:
@@ -222,8 +233,7 @@ def corporate_actions(instrument_id: str | None = None,
     }
 
 
-@router.get("/adjustment-factor",
-            dependencies=[Depends(require(Permission.READ_MARKET))])
+@router.get("/adjustment-factor")
 def adjustment_factor(instrument_id: str, from_date: date = Query(...),
                       to_date: date | None = None):
     f = CA_BOOK.cumulative_price_factor(instrument_id, from_date, to_date)
@@ -246,8 +256,7 @@ class AdjustPositionRequest(BaseModel):
     ex_date: date
 
 
-@router.post("/adjust-position",
-             dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.post("/adjust-position")
 def adjust_position(req: AdjustPositionRequest):
     actions = [a for a in CA_BOOK.for_instrument(req.instrument_id)
                if a.ex_date == req.ex_date]
@@ -276,14 +285,12 @@ class PositionReconRequest(BaseModel):
     as_of: date | None = None
 
 
-@router.post("/reconcile/positions",
-             dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.post("/reconcile/positions")
 def recon_positions(req: PositionReconRequest):
     return reconcile_positions(req.ours, req.theirs, as_of=req.as_of).to_dict()
 
 
-@router.post("/reconcile/cash",
-             dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.post("/reconcile/cash")
 def recon_cash(req: PositionReconRequest):
     return reconcile_cash(req.ours, req.theirs, as_of=req.as_of).to_dict()
 
@@ -302,8 +309,7 @@ class TradeReconRequest(BaseModel):
     price_tolerance: float = 0.005
 
 
-@router.post("/reconcile/trades",
-             dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.post("/reconcile/trades")
 def recon_trades(req: TradeReconRequest):
     return reconcile_trades(
         [Holding(r.key, r.qty, r.price, r.trade_date) for r in req.ours],
@@ -328,7 +334,7 @@ class CycleRequest(BaseModel):
     require_full_marks: bool = True
 
 
-@router.post("/batch/sod", dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.post("/batch/sod")
 def run_sod(req: CycleRequest):
     sid, cyc = _cycle(req.session_id)
     try:
@@ -341,7 +347,7 @@ def run_sod(req: CycleRequest):
     return {"session_id": sid, **res.to_dict()}
 
 
-@router.post("/batch/eod", dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.post("/batch/eod")
 def run_eod(req: CycleRequest):
     sid, cyc = _cycle(req.session_id)
     try:
@@ -356,7 +362,7 @@ def run_eod(req: CycleRequest):
     return {"session_id": sid, **res.to_dict()}
 
 
-@router.get("/batch/history", dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.get("/batch/history")
 def batch_history(session_id: str):
     with _cycles_lock:
         cyc = _cycles.get(session_id)
@@ -367,8 +373,7 @@ def batch_history(session_id: str):
                     "than repeated; reverse it explicitly to re-run."}
 
 
-@router.delete("/batch/{session_id}/{business_date}/{phase}",
-               dependencies=[Depends(require(Permission.READ_BLOTTER))])
+@router.delete("/batch/{session_id}/{business_date}/{phase}")
 def reverse_run(session_id: str, business_date: date, phase: str):
     with _cycles_lock:
         cyc = _cycles.get(session_id)
