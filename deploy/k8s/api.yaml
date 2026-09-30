@@ -22,7 +22,11 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8000"
-        prometheus.io/path: "/metrics"
+        # Trailing slash deliberately, matching observability/prometheus.yml:
+        # /metrics is an ASGI sub-app mount, so without it Starlette answers 307
+        # with an absolute Location. Prometheus follows it, so it works -- but it
+        # costs an extra round trip on every scrape.
+        prometheus.io/path: "/metrics/"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -98,6 +102,20 @@ metadata:
   namespace: quantgenlabs
 spec:
   selector: { app.kubernetes.io/name: qgl-api }
+  # Sticky by client IP, because several endpoint families keep per-session state
+  # in PROCESS memory and two replicas round-robin without this:
+  #   /api/desk/*     a FIX session whose sequence numbers only mean something
+  #                   within one connection -- it cannot be shared or rebuilt.
+  #   /api/refdata/batch/*  the SOD/EOD run log. This one matters quietly: the
+  #                   log is what makes a repeated cycle REFUSE. Land the second
+  #                   EOD on the other pod and the guard does not fire, which is
+  #                   the exact failure it exists to prevent.
+  # ClientIP is the minimum that makes two replicas correct. It is not a
+  # substitute for moving that state to Postgres, which is what a real
+  # deployment would do; see docs/deployment.md.
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP: { timeoutSeconds: 10800 }
   ports:
     - { name: http, port: 8000, targetPort: http }
 ---
