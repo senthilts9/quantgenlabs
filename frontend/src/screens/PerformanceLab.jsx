@@ -74,8 +74,185 @@ function Pill({ children, tone = T.dim }) {
   );
 }
 
+/* Latency distribution. Kept visually distinct from the throughput tables above
+ * because the two answer different questions and conflating them is the mistake
+ * this screen exists to prevent: throughput says how many per second, latency
+ * says how long ONE takes at p99.9. A path averaging 200ns with a 50us p99.9 is
+ * not a 200ns path. */
+function LatencySection({ lat }) {
+  if (!lat) {
+    return (
+      <Box title="Per-operation latency" tone={T.amber}
+           sub="No latency results on disk, and this screen will not invent any.">
+        <div style={{ padding: 16 }}>
+          <code style={{ display: "block", background: T.panel2, border: `1px solid ${T.line}`,
+                         borderRadius: 6, padding: "9px 12px", fontFamily: MONO,
+                         fontSize: 12, color: T.teal }}>./benchmarks/run.sh</code>
+        </div>
+      </Box>
+    );
+  }
+
+  const t = lat.timer || {};
+  const cpu = lat.cpu_placement || {};
+  const rows = lat.measurements || [];
+  const h = lat.summary?.handoff_comparison;
+  const floor = t.floor_ns ?? 0;
+  const atFloor = lat.summary?.at_timer_floor ?? 0;
+
+  // Split the handoff rows out: they are a comparison between mechanisms, not
+  // operations on the hot path, and mixing them into one table invites reading a
+  // 4.9us mutex wake-up as though it were a book update.
+  const ops = rows.filter((r) => !r.name.startsWith("handoff."));
+  const handoffs = rows.filter((r) => r.name.startsWith("handoff."));
+
+  return (
+    <>
+      <Box
+        title="Measurement floor and CPU placement"
+        tone={atFloor === 0 ? T.teal : T.amber}
+        sub="A latency figure at or below the timer's own cost is a measurement of the timer, not of the code."
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
+                      gap: 1, background: T.lineSoft }}>
+          {[
+            ["Timer", t.source],
+            ["Calibrated", t.calibrated_ghz ? `${t.calibrated_ghz.toFixed(4)} GHz` : "—"],
+            ["clock_gettime p50", t.clock_gettime_overhead_ns ? `${t.clock_gettime_overhead_ns.p50} ns` : "—"],
+            ["RDTSC p50", t.tsc_overhead_ns ? `${t.tsc_overhead_ns.p50} ns` : "—"],
+            ["Floor in use", `${floor} ns`],
+            ["At the floor", `${atFloor} of ${rows.length}`],
+            ["CPU placement", cpu.pin_result],
+            ["NUMA nodes", cpu.numa_nodes],
+          ].map(([k, v]) => (
+            <div key={k} style={{ background: T.panel, padding: "9px 13px" }}>
+              <div style={{ color: T.faint, fontSize: 9.5, letterSpacing: 0.9, textTransform: "uppercase" }}>{k}</div>
+              <div style={{ fontFamily: MONO, fontSize: 12, marginTop: 3, color: T.text, wordBreak: "break-word" }}>
+                {v ?? "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: "10px 14px", borderTop: `1px solid ${T.lineSoft}`,
+                      color: atFloor === 0 ? T.teal : T.amber, fontSize: 11.5, lineHeight: 1.6 }}>
+          {atFloor === 0
+            ? `Every measurement is above the ${floor}ns timer floor, so all of them describe the code rather than the clock.`
+            : `${atFloor} measurement(s) sit at the timer floor and are marked do-not-quote below.`}
+        </div>
+        {cpu.note && (
+          <div style={{ padding: "0 14px 12px", color: T.faint, fontSize: 11, lineHeight: 1.6 }}>
+            {cpu.note}
+          </div>
+        )}
+      </Box>
+
+      <Box
+        title="Per-operation latency"
+        sub={<>Nanoseconds per operation. <b>Read p99/p50 first</b> — a ratio near 1 is a predictable path; a large one means the median is not describing the system.</>}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 660 }}>
+            <thead>
+              <tr>
+                <Th align="left">Operation</Th>
+                <Th>p50</Th><Th>p90</Th><Th>p99</Th><Th>p99.9</Th><Th>max</Th>
+                <Th title="p99 divided by p50">p99/p50</Th>
+                <Th align="left"> </Th>
+              </tr>
+            </thead>
+            <tbody>
+              {ops.sort((a, b) => a.p50 - b.p50).map((m) => {
+                const hot = m.name === "tick_to_order";
+                return (
+                  <tr key={m.name} style={m.at_timer_floor ? { opacity: 0.55 } : undefined}>
+                    <Cell align="left" mono={false} color={hot ? T.teal : undefined}>
+                      {hot ? <b>{m.name}</b> : m.name}
+                    </Cell>
+                    <Cell color={hot ? T.teal : undefined}>{m.p50.toFixed(0)}</Cell>
+                    <Cell dim>{m.p90.toFixed(0)}</Cell>
+                    <Cell>{m.p99.toFixed(0)}</Cell>
+                    <Cell color={m.p999 > m.p50 * 5 ? T.amber : undefined}>{m.p999.toFixed(0)}</Cell>
+                    <Cell dim>{m.max.toFixed(0)}</Cell>
+                    <Cell color={m.p99_over_p50 > 3 ? T.amber : m.p99_over_p50 > 1.5 ? T.text : T.teal}>
+                      {m.p99_over_p50.toFixed(1)}×
+                    </Cell>
+                    <Cell align="left" mono={false}>
+                      {m.at_timer_floor && <Pill tone={T.red}>at timer floor</Pill>}
+                    </Cell>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ padding: "10px 14px", borderTop: `1px solid ${T.lineSoft}`,
+                      color: T.dim, fontSize: 11, lineHeight: 1.6 }}>
+          <b style={{ color: T.teal }}>tick_to_order</b> is the full path: validate tick →
+          book update → top-of-book read → pre-trade risk → encode NewOrderSingle.
+          It <b>excludes network, kernel and venue time</b>, which dominate real
+          wire-to-wire latency and are not being claimed here.
+          <br /><br />
+          <b style={{ color: T.amber }}>Ignore the max column.</b> It runs to tens or
+          hundreds of microseconds while p99.9 stays in the tens of nanoseconds,
+          because a single sample caught an OS scheduler preemption. That is a
+          property of running on a general-purpose kernel without isolated cores,
+          not of the code — and it is exactly what CPU placement above says this
+          host cannot control. It is shown rather than trimmed, because a
+          benchmark that hides its worst sample is choosing which truth to tell.
+        </div>
+      </Box>
+
+      <Box
+        title="Cross-thread handoff — why a mutex is the wrong primitive"
+        sub="One message across an empty queue, producer paced so nothing queues."
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
+            <thead>
+              <tr>
+                <Th align="left">Mechanism</Th><Th>p50</Th><Th>p99</Th><Th>p99.9</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {handoffs.map((m) => {
+                const mutex = m.name.includes("mutex");
+                return (
+                  <tr key={m.name}>
+                    <Cell align="left" mono={false}>{m.name.replace("handoff.", "")}</Cell>
+                    <Cell color={mutex ? T.red : T.teal}>{m.p50.toFixed(0)}</Cell>
+                    <Cell color={mutex ? T.red : T.teal}>{m.p99.toFixed(0)}</Cell>
+                    <Cell color={mutex ? T.red : T.teal}>{m.p999.toFixed(0)}</Cell>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {h && (
+          <div style={{ padding: "12px 14px", borderTop: `1px solid ${T.lineSoft}` }}>
+            <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginBottom: 9 }}>
+              <div>
+                <div style={{ color: T.faint, fontSize: 9.5, letterSpacing: 0.9, textTransform: "uppercase" }}>p50 gap</div>
+                <div style={{ fontFamily: MONO, fontSize: 20, color: T.text }}>{h.p50_ratio}×</div>
+              </div>
+              <div>
+                <div style={{ color: T.faint, fontSize: 9.5, letterSpacing: 0.9, textTransform: "uppercase" }}>p99.9 gap</div>
+                <div style={{ fontFamily: MONO, fontSize: 20, color: T.red }}>{h.p999_ratio}×</div>
+              </div>
+            </div>
+            <p style={{ color: T.dim, fontSize: 11.5, lineHeight: 1.6, margin: 0, maxWidth: 720 }}>
+              {h.note}
+            </p>
+          </div>
+        )}
+      </Box>
+    </>
+  );
+}
+
 export default function PerformanceLab() {
   const [data, setData] = useState(null);
+  const [lat, setLat] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -87,6 +264,13 @@ export default function PerformanceLab() {
       })
       .then(setData)
       .catch((e) => setErr(e.message));
+
+    // Latency is a separate fetch and a separate failure: throughput results can
+    // exist without latency results, and one missing should not blank the other.
+    fetch("/api/connectivity/latency")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setLat)
+      .catch(() => setLat(null));
   }, []);
 
   if (err) {
@@ -299,6 +483,8 @@ export default function PerformanceLab() {
           quietly dropping the inconvenient row is how a benchmark table becomes dishonest.
         </div>
       </Box>
+
+      <LatencySection lat={lat} />
 
       <div style={{ color: T.faint, fontSize: 11, lineHeight: 1.6, padding: "0 2px 8px" }}>
         <b style={{ color: T.dim }}>Methodology.</b> {(base || avx)?.methodology}

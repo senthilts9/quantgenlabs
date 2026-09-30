@@ -207,3 +207,71 @@ def test_fix_parse_detects_corruption_and_can_skip_validation():
     r = client.get("/api/connectivity/fix/parse", params={"raw": bad, "validate": False})
     assert r.json()["ok"] is True
     assert r.json()["fields"]["49"] == "XERVER"
+
+
+# ------------------------------------------------------------------ latency
+def test_latency_serves_measured_results_or_404s():
+    r = client.get("/api/connectivity/latency")
+    if r.status_code == 404:
+        assert "will not synthesise" in r.json()["detail"]
+        return
+    d = r.json()
+    assert d["kind"] == "latency_distribution"
+    assert d["units"] == "nanoseconds per operation"
+    assert d["measurements"]
+
+
+def test_latency_reports_the_timer_it_actually_used():
+    """A latency figure is only meaningful alongside the cost of the instrument
+    that produced it."""
+    r = client.get("/api/connectivity/latency")
+    if r.status_code == 404:
+        pytest.skip("no latency results on disk")
+    t = r.json()["timer"]
+    assert "source" in t and t["floor_ns"] >= 0
+    assert "clock_gettime_overhead_ns" in t
+    if t["tsc_usable"]:
+        # RDTSC must be cheaper than clock_gettime, or there was no point.
+        assert t["tsc_overhead_ns"]["p50"] < t["clock_gettime_overhead_ns"]["p50"]
+        assert t["calibrated_ghz"] > 0
+
+
+def test_latency_flags_anything_at_the_timer_floor():
+    r = client.get("/api/connectivity/latency")
+    if r.status_code == 404:
+        pytest.skip("no latency results on disk")
+    d = r.json()
+    floor = d["timer"]["floor_ns"]
+    for m in d["measurements"]:
+        # The flag must agree with the numbers: a result at the floor that is not
+        # flagged is one that will be quoted as though it were measured.
+        assert m["at_timer_floor"] == (m["p50"] <= floor * 1.25)
+    assert d["summary"]["at_timer_floor"] == len(d["summary"]["at_timer_floor_names"])
+
+
+def test_latency_reports_cpu_placement_honestly():
+    """'Pinned' means different things per platform, and reporting a hint as a
+    guarantee is worse than not pinning."""
+    r = client.get("/api/connectivity/latency")
+    if r.status_code == 404:
+        pytest.skip("no latency results on disk")
+    c = r.json()["cpu_placement"]
+    assert c["pin_result"] in (
+        "pinned (hard constraint)", "hint only (kernel may ignore)",
+        "unsupported on this platform", "call failed")
+    # A platform without hard pinning must not claim it.
+    if not c["hard_pinning_available"]:
+        assert c["pin_result"] != "pinned (hard constraint)"
+
+
+def test_handoff_comparison_shows_the_tail_gap_not_just_the_median():
+    r = client.get("/api/connectivity/latency")
+    if r.status_code == 404:
+        pytest.skip("no latency results on disk")
+    h = r.json()["summary"]["handoff_comparison"]
+    if h is None:
+        pytest.skip("handoff measurements absent")
+    assert h["p50_ratio"] > 1 and h["p999_ratio"] > 1
+    # The argument for lock-free is the TAIL, so the p99.9 gap should dominate.
+    assert h["p999_ratio"] > h["p50_ratio"]
+    assert "unbounded" in h["note"]

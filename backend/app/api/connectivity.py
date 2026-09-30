@@ -105,6 +105,58 @@ def performance() -> dict:
     return out
 
 
+@router.get("/latency")
+def latency() -> dict:
+    """Serve the measured latency distribution. Never synthesised.
+
+    Separate from /performance because the two answer different questions and
+    should not be confused: that one is THROUGHPUT (how many per second), this is
+    the TAIL (how long does one take, at p99.9). A path averaging 200ns with a
+    50us p99.9 is not a 200ns path, and only this endpoint can say so.
+    """
+    p = _BENCH_DIR / "results-latency.json"
+    if not p.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=("No latency results on disk. Run ./benchmarks/run.sh on an "
+                    "idle machine. This endpoint will not synthesise numbers."),
+        )
+    try:
+        data = json.loads(p.read_text())
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"unreadable: {e}") from e
+
+    measurements = data.get("measurements", [])
+    at_floor = [m["name"] for m in measurements if m.get("at_timer_floor")]
+    # The handoff comparison is the headline: it is the argument for lock-free
+    # over a mutex on a trading path, and the p99.9 gap is the whole point.
+    by_name = {m["name"]: m for m in measurements}
+    spsc = by_name.get("handoff.spsc_lockfree")
+    mutex = by_name.get("handoff.mutex_condvar")
+    handoff = None
+    if spsc and mutex and spsc["p50"] > 0 and spsc["p999"] > 0:
+        handoff = {
+            "spsc_p50": spsc["p50"], "mutex_p50": mutex["p50"],
+            "spsc_p999": spsc["p999"], "mutex_p999": mutex["p999"],
+            "p50_ratio": round(mutex["p50"] / spsc["p50"], 1),
+            "p999_ratio": round(mutex["p999"] / spsc["p999"], 1),
+            "note": ("The p99.9 ratio is the argument, not the p50. A mutex is "
+                     "not merely slower on average: its tail is unbounded, "
+                     "because the wake-up is a syscall and a producer "
+                     "descheduled holding the lock stops the consumer for a "
+                     "whole scheduling quantum."),
+        }
+    return {
+        **data,
+        "summary": {
+            "measurements": len(measurements),
+            "at_timer_floor": len(at_floor),
+            "at_timer_floor_names": at_floor,
+            "handoff_comparison": handoff,
+        },
+    }
+
+
 # ----------------------------------------------------------------- order book
 class BookUpdate(BaseModel):
     side: int = Field(..., ge=0, le=1, description="0 = bid, 1 = ask")
