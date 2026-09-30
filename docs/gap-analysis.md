@@ -17,13 +17,13 @@ overstated some things.
 | § | Area | Before | Now | Notes |
 |---|---|---|---|---|
 | 1 | Event-driven architecture, DDD, clean layering | Partial | **Good** | The order flow now PUBLISHES to the bus — `orders.lifecycle`, `trades.executed`, `market.normalized`, `risk.breaches` — and P&L is a genuine consumer rebuilt from that log rather than a second copy of desk state. Publishing is wrapped so a bus failure cannot fail a trade. |
-| 2 | Market-data platform | Partial | **Good** | Feed validation, gap/duplicate/reorder/stale/outlier detection and an L2 book added in C++. Corporate actions, symbology and calendars still absent. |
+| 2 | Market-data platform | Partial | **Good** | Feed validation, gap/duplicate/reorder/stale/outlier detection and an L2 book added in C++. Symbology (as-of-date resolution), trading calendars and corporate actions now added in `core/refdata`. |
 | 3 | Kafka / streaming backbone | **Absent** | **Good** | Topic catalogue with justified partition keys, retention and schema versions; EventBus interface; KafkaBus (written, never run — no broker here); InProcessBus implementing the same semantics and fully tested (ordering, consumer groups, at-least-once, idempotency, DLQ, replay). WebSocket streaming to the UI. |
 | 4 | Databricks / Delta Lake / medallion | **Absent** | **Good** | Bronze/silver/gold on delta-rs — **real Delta tables, genuinely executed and tested**, no Spark/JVM/Databricks needed. Idempotent ingest, rejects kept with reasons, time travel. Databricks itself would add a cluster and Unity Catalog, not a different format. |
 | 5 | PostgreSQL operational store | **Absent** | **Good** | SQLAlchemy schema + repository + Alembic, opt-in via QGL_DATABASE_URL. 53 repository tests run against BOTH SQLite and a real PostgreSQL 16.2 (pgserver wheel, no Docker needed); migrations verified up AND down on both. Crypto desk deliberately stays on SQLite. |
 | 6 | C++ low-latency core | Partial | **Good** | Book, feed handler, FIX engine, pre-trade risk, matching engine, plus a lock-free SPSC ring and a **latency-distribution harness (P50/P90/P99/P99.9)** — the tail figures §6 asked for and earlier throughput work had not answered. |
 | 7 | FIX protocol / connectivity | **Absent** | **Good** | Wire format + session layer + simulated venue, 48 tests. Logon/Heartbeat/TestRequest/Resend/NewOrderSingle/ExecutionReport/Cancel/CancelReplace/Reject/Logout. |
-| 8 | Complete trade lifecycle | Partial | **Good** | End to end and runnable (`lifecycle_demo`). Allocation, confirmation, settlement and reconciliation still absent. |
+| 8 | Complete trade lifecycle | Partial | **Good** | End to end and runnable (`lifecycle_demo`). Reconciliation (positions/cash/trades, classified breaks) and settlement-date calculation now added; allocation and confirmation still absent. |
 | 9 | OMS / EMS / SOR | **Good** | **Good** | Marginal-cost routing, ML fill probability, TCA. Now also **TWAP / VWAP / POV execution algos** on the institutional desk with slice scheduling, pause/resume/cancel, and implementation shortfall against the arrival mid. |
 | 10 | Pricing engine | **Good** | **Good** | BSM, Black-76, binomial, MC, LSM American, GARCH, curves, PCA. Heston/SABR/local-vol absent. |
 | 11 | Risk engine | **Good** | **Good** | VaR/ES (historical, parametric, MC), EVT tails, stress, Greeks, limits. CVA/PFE absent. |
@@ -33,9 +33,9 @@ overstated some things.
 | 15 | Enterprise UI/UX | Partial | **Good** | Command palette (⌘K, fuzzy), light/dark theme on CSS tokens, virtualised sortable/filterable table with CSV export, Trading Desk with ladder + ticket + blotter + FIX monitor, and **WebSocket streaming with reconnect, gap detection and a data-freshness indicator**. Still missing: resizable panels, saved workspaces. |
 | 16 | Observability / SRE | Partial | **Good** | Prometheus (**6 → 28 metrics**, covering order flow, pre-trade decisions by reason, market-data verdicts, P&L, event-bus lag/DLQ, FIX sessions and algo shortfall), a dedicated **Trading Desk Grafana dashboard** (17 panels), OpenTelemetry tracing correlated on ClOrdID, and an X-Trace-Id response header. CI asserts every panel query references a metric the code declares. |
 | 17 | Security / RBAC | **Absent** | **Good** | JWT + scrypt + four roles as separations of duty (trader cannot set limits, risk cannot trade, admin is not a superset). Opt-in via QGL_REQUIRE_AUTH; the ENABLED path is tested. Crypto desk keeps its wallet-signature auth. |
-| 18 | Testing | Partial | **Good** | 155 C++ (was 9), 275 Python (was 48), 16 frontend units (was 0), 5 property, 3 verifiers. Load/soak/failure-recovery still absent. |
+| 18 | Testing | Partial | **Good** | 197 C++ (was 9), 496 Python (was 48), 16 frontend units (was 0), 5 property, 3 verifiers — **709 total**. `scripts/run_cpp_tests.sh` builds and runs the C++ suite without cmake. Load/soak/failure-recovery still absent. |
 | 19 | Benchmark / performance lab | Partial | **Good** | Throughput harness *and* a latency-distribution harness that measures the clock's own cost first and flags any result sitting at that floor. Surfaced in a Performance Lab screen that cannot display a number the harness did not produce. |
-| 20 | Institutional features | Partial | Partial | Kill switch, fat-finger, collars, position limits, halts, rate limiting added. Security master, reconciliation, EOD/SOD, model governance absent. |
+| 20 | Institutional features | Partial | **Good** | Kill switch, fat-finger, collars, position limits, halts, rate limiting, plus `core/refdata`: security master with as-of-date resolution, computed trading calendars with T+2 settlement, corporate actions adjusting positions and price history together, a reconciliation engine that classifies breaks rather than reporting a boolean, and an idempotent SOD/EOD cycle. Surfaced in a Reference Data screen. Model governance still absent. |
 | 21 | Repository structure | Partial | Partial | `cpp/`, `backend/`, `frontend/`, `docs/`, `benchmarks/`, `observability/`. Not restructured into the `/services` + `/apps` layout the spec sketches. |
 | 22 | Incremental execution | — | **Done** | Version control established first; each increment built, tested and committed separately. |
 
@@ -43,13 +43,14 @@ overstated some things.
 
 |  | Before | After C++ core | Now |
 |---|---|---|---|
-| Good | 5 | 11 | **20** |
-| Partial | 9 | 8 | **2** |
+| Good | 5 | 11 | **21** |
+| Partial | 9 | 8 | **1** |
 | Absent | 7 | 5 | **0** |
 
-Still Partial: **§20 institutional features** (security master, reconciliation
-engine, EOD/SOD, model governance) and **§21 repository structure** (deliberately
-not restructured — see the note at the end).
+Still Partial: **§21 repository structure** alone (deliberately not restructured —
+see the note at the end). §20 closed with the `core/refdata` layer; the one piece
+of it still absent is model governance, which is noted in the row rather than
+hidden behind a green mark.
 
 Execution algos (§9) and trading observability (§16) were extended in the
 deployment pass: TWAP/VWAP/POV with TCA, and the Prometheus metric set grown from

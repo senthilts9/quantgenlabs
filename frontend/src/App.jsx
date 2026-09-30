@@ -3,7 +3,7 @@ import {
   LayoutGrid, Activity, Sigma, TriangleAlert, ShieldCheck, LineChart as LineIcon,
   Layers, Briefcase, Gauge, Coins, History, Database, Bot,
   BookOpen, Search, Command, Circle, ArrowUpRight, ArrowDownRight, Cpu, Zap,
-  CheckCircle2, ChevronRight, Router, Split, Sun, Moon,
+  CheckCircle2, ChevronRight, Router, Split, Sun, Moon, Library,
 } from "lucide-react";
 // Phase 1 digital-assets desk. Aliased because this file already defines a
 // `CryptoDesk` (the previous perps/AMM screen), which the new workspace
@@ -21,6 +21,7 @@ import { T, MONO, THEME_CSS, initialTheme, applyTheme } from "./theme.js";
 import PerformanceLab from "./screens/PerformanceLab.jsx";
 import ConnectivityScreen from "./screens/Connectivity.jsx";
 import TradingDesk from "./screens/TradingDesk.jsx";
+import ReferenceData from "./screens/ReferenceData.jsx";
 import CommandPalette, { useCommandPalette } from "./components/CommandPalette.jsx";
 
 /* ================================================================== *
@@ -140,6 +141,7 @@ const NAV = [
     { id: "connectivity", label: "Connectivity & FIX", icon: Split },
     { id: "perflab", label: "Performance Lab", icon: Cpu }] },
   { group: "ANALYTICS", items: [
+    { id: "refdata", label: "Reference Data", icon: Library },
     { id: "quanthub", label: "Risk & Quant Hub", icon: Sigma },
     { id: "backtest", label: "Backtesting / TCA", icon: History },
     { id: "market", label: "Market Data", icon: Database },
@@ -153,7 +155,7 @@ const NAV = [
 // NAV entry without a branch surfaces immediately.
 const HANDLED = new Set(["overview", "sor", "blotter", "limits", "market", "rates",
   "backtest", "sensitivity", "stress", "optim", "genai", "models", "market-risk", "quanthub",
-  "pricing", "obs", "copilot", "connectivity", "perflab", "desk",
+  "pricing", "obs", "copilot", "connectivity", "perflab", "desk", "refdata",
   ...(CRYPTO_DESK_ENABLED ? ["cryptodesk"] : [])]);
 
 export default function Console() {
@@ -271,6 +273,7 @@ export default function Console() {
             <div className="qgl-desk"><DigitalAssetsDesk /></div>
           )}
           {view === "desk" && <TradingDesk />}
+          {view === "refdata" && <ReferenceData />}
           {view === "connectivity" && <ConnectivityScreen />}
           {view === "perflab" && <PerformanceLab />}
           {view === "obs" && <Observability />}

@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 from .api import (algo, auth, connectivity, desk, events_api, stream, bench, cryptodesk, cryptodesk_auth, frm, genai, marketdata,
                   observability, oms, dex_board, portfolio, pricing,
-                  quanthub, rates, risk, sor, tca)
+                  quanthub, rates, refdata, risk, sor, tca)
 from .core import crypto
 from .obs import tracing
 from .services.copilot import router as copilot_router
@@ -90,6 +90,7 @@ app.include_router(stream.router)
 app.include_router(events_api.router)
 app.include_router(events_api.pnl_router)
 app.include_router(algo.router)
+app.include_router(refdata.router)
 app.include_router(frm.router)
 app.include_router(quanthub.router)
 app.include_router(genai.router)
