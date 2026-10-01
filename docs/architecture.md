@@ -147,13 +147,17 @@ not preserving order). Both are dropped, but they are different diagnoses.
 | `backend/app/core/refdata/corporate_actions.py` | splits/dividends: positions and history together | 9 |
 | `backend/app/core/refdata/reconciliation.py` | classified breaks, not a boolean | 12 |
 | `backend/app/core/refdata/daily.py` | idempotent SOD/EOD; step order is the correctness | 16 |
-| `backend/cryptodesk/*` | crypto venues, OMS, algos, perps, DeFi, vault, wallet | pytest |
+| `backend/cryptodesk/*` | crypto venues, OMS, algos, perps, DeFi, vault, wallet | 251 |
+| `backend/tools/crash_invariants.py` | cross-process state survival; write half crashes on purpose | CI step |
 | `cpp/src/mkt_bench.cpp` | reproducible benchmark harness → JSON | run in CI |
 | `cpp/src/lifecycle_demo.cpp` | the whole path, printed | run in CI |
 
-**197 C++ tests** (`scripts/run_cpp_tests.sh`, no cmake required), **496 Python
-tests**, **16 frontend units**, 5 property tests and 3 math verifiers — 709 in
-total.
+**197 C++ tests** (`scripts/run_cpp_tests.sh`, no cmake required), **755 Python
+tests**, **16 frontend units**, 5 property tests and 3 math verifiers — 968 in
+total. 251 of the Python tests are the crypto desk's, carried over from
+`senthilts9/cryptodesk`; they pass unchanged against this copy even though it has
+diverged ahead of upstream, which is what makes them a regression net rather than
+a stale snapshot.
 
 ## Reference data
 
