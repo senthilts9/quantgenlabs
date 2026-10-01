@@ -75,6 +75,29 @@ jobs:
         run: cd backend && PYTHONPATH=. pytest tests -q
       - name: Offline property runner (no test deps)
         run: python backend/tests/run_local.py
+      # Cross-process durability. The two halves MUST be separate interpreters:
+      # an in-process check passes on a cache that a real restart would lose, and
+      # the invariants here are the ones where losing state causes silent wrong
+      # behaviour rather than an error -- a kill switch that un-latches on
+      # restart, or a high-water mark that resets and lets the vault charge
+      # performance fees on the recovery from its own drawdown.
+      - name: Crypto desk crash invariants (cross-process)
+        run: |
+          cd backend
+          # The write half ends in os._exit(137) ON PURPOSE: it simulates an
+          # uncontrolled crash, skipping every flush, cleanup and atexit hook. A
+          # graceful exit would prove nothing, so 137 is the SUCCESS code here
+          # and anything else -- 0 included -- means the crash was not simulated
+          # and the read half is checking a clean shutdown instead.
+          set +e
+          PYTHONPATH=. python tools/crash_invariants.py "$RUNNER_TEMP/inv.db" write
+          rc=$?
+          set -e
+          if [ "$rc" -ne 137 ]; then
+            echo "expected the write half to die with 137 (simulated crash), got $rc"
+            exit 1
+          fi
+          PYTHONPATH=. python tools/crash_invariants.py "$RUNNER_TEMP/inv.db" read
       - name: Engine math verifiers
         run: |
           python backend/verify/verify_core.py
