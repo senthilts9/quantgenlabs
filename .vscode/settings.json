@@ -1,0 +1,39 @@
+{
+  // Headers here are C++, not C. Without this, .hpp opens with the C language
+  // mode in some configurations and every template reports a syntax error.
+  "files.associations": {
+    "*.hpp": "cpp",
+    "*.tpp": "cpp"
+  },
+
+  // The C++ core is header-only, so "go to definition" lands in a .hpp and
+  // edits happen there. Trim trailing whitespace on save to keep diffs to the
+  // lines that actually changed.
+  "[cpp]": {
+    "editor.rulers": [88],
+    "files.trimTrailingWhitespace": true,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+  },
+
+  // Keep the generated database and build outputs out of search and the file
+  // tree -- compile_commands.json is 24 entries of absolute paths and matches
+  // every search for a type name.
+  "search.exclude": {
+    "**/cpp/compile_commands.json": true,
+    "**/cpp/.debug": true,
+    "**/node_modules": true,
+    "**/.venv": true,
+    "**/dist": true,
+    "**/__pycache__": true
+  },
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/node_modules/**": true,
+    "**/cpp/.debug/**": true
+  },
+
+  // Point the Python side at the project venv so the backend's imports resolve
+  // too -- pybind11 lives there and the C++ bindings are imported from it.
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python"
+}

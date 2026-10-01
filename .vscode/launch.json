@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Debug whichever test file is open. preLaunchTask builds it at -O0 -g
+      // first: the normal build is -O2 and the optimiser inlines the hot path
+      // into something you cannot usefully step through -- breakpoints bind to
+      // lines that no longer exist and locals read as <optimized out>.
+      "name": "C++: debug current test file",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/cpp/.debug/${fileBasenameNoExtension}",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "C++: build current test file (debug)",
+      // lldb, not gdb: gdb on macOS needs codesigning and this box has lldb
+      // from the Command Line Tools already.
+      "MIMode": "lldb",
+      "stopAtEntry": false,
+      "externalConsole": false
+    }
+  ]
+}

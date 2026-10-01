@@ -1,0 +1,73 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // The default build (Cmd+Shift+B). Compiles and runs all 11 test binaries.
+      // There is no cmake on this machine, which is why the script compiles each
+      // translation unit directly -- see the note in run_cpp_tests.sh.
+      "label": "C++: build + run all tests",
+      "type": "shell",
+      "command": "./scripts/run_cpp_tests.sh",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      // Compile ONE file with the exact flags from compile_commands.json, so a
+      // syntax error shows up in seconds instead of after a full suite build.
+      // -fsyntax-only: no object file, no link, just the diagnostics.
+      "label": "C++: syntax-check current file",
+      "detail": "Seconds, not a full suite build -- uses that file's real flags",
+      "type": "shell",
+      "command": "./scripts/syntax_check.py",
+      "args": ["${file}"],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "C++: build pybind11 extensions",
+      "type": "shell",
+      "command": "./scripts/build_bindings.sh",
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "C++: regenerate compile_commands.json",
+      "detail": "Run after adding a .cpp file or changing the venv",
+      "type": "shell",
+      "command": "./scripts/gen_compile_commands.sh",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      // Built separately from the test task because it is the thing the
+      // debugger attaches to -- see .vscode/launch.json. -O0 -g, deliberately:
+      // the Release build inlines the hot path into something you cannot step
+      // through.
+      "label": "C++: build current test file (debug)",
+      "type": "shell",
+      "command": "clang++",
+      "args": [
+        "-std=c++20", "-O0", "-g", "-Wall", "-Wextra", "-pthread",
+        "-I${workspaceFolder}/cpp/include",
+        "-I${workspaceFolder}/cpp/tests",
+        "${file}",
+        "-o", "${workspaceFolder}/cpp/.debug/${fileBasenameNoExtension}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "C++: benchmarks (release)",
+      "detail": "Run on an idle machine -- this host throttles and spread reaches 43%",
+      "type": "shell",
+      "command": "./benchmarks/run.sh",
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ]
+}

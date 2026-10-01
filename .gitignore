@@ -38,10 +38,28 @@ __pycache__/
 backend/tearsheet.png
 backend/equity_curve.csv
 
+# Generated for IntelliSense by scripts/gen_compile_commands.sh. Holds absolute
+# paths to this machine's interpreter and SDK, so it is per-machine by nature --
+# committing it would point every other checkout at paths that do not exist.
+cpp/compile_commands.json
+# Debug binaries from the VS Code debug task (-O0 -g).
+cpp/.debug/
+
 # Editor / OS
 .DS_Store
 .idea/
-.vscode/
+# .vscode: ignore the personal/volatile files, COMMIT the project tooling. The
+# five below are project configuration, not preference -- without them a fresh
+# clone opens the C++ core with no include paths and no C++20, so every
+# `#include "mkt/..."` and every concept reports an error that is not real.
+# Anything else VS Code drops in here (per-user state, extension caches) stays
+# ignored.
+.vscode/*
+!.vscode/c_cpp_properties.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # Hypothesis property-test database (machine-local falsifying examples)
 .hypothesis/

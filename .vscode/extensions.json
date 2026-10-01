@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "ms-vscode.cpptools",
+    "ms-python.python"
+  ],
+  // cmake-tools is deliberately NOT recommended: there is no cmake on this
+  // machine and the C++ here is built by direct compiler invocation
+  // (scripts/run_cpp_tests.sh). Recommending it prompts people to configure a
+  // build system the project does not use.
+  "unwantedRecommendations": []
+}
