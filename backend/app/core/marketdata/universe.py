@@ -78,6 +78,10 @@ UNIVERSE: tuple[Instrument, ...] = (
     _i("SPX", "S&P 500", "EQUITY_INDEX", "fred", "SP500", "PRICE", "EQUITY", "index"),
     _i("NDX", "Nasdaq 100", "EQUITY_INDEX", "fred", "NASDAQ100", "PRICE", "EQUITY", "index"),
     _i("DJI", "Dow Jones Industrial", "EQUITY_INDEX", "fred", "DJIA", "PRICE", "EQUITY", "index"),
+    # Quoted in JPY, not USD. Marking it as USD would value a Nikkei position
+    # at roughly 150x its worth and the error looks like a fat finger, not a
+    # currency bug.
+    _i("NKY", "Nikkei 225", "EQUITY_INDEX", "fred", "NIKKEI225", "PRICE", "EQUITY", "index", "JPY"),
 
     # --- volatility -------------------------------------------------------
     _i("VIX", "CBOE Volatility Index", "VOLATILITY", "fred", "VIXCLS", "PRICE", "VOL", "vol pts"),
@@ -85,6 +89,14 @@ UNIVERSE: tuple[Instrument, ...] = (
     _i("VXD", "Dow Volatility", "VOLATILITY", "fred", "VXDCLS", "PRICE", "VOL", "vol pts"),
     _i("OVX", "Crude Oil Volatility", "VOLATILITY", "fred", "OVXCLS", "PRICE", "VOL", "vol pts"),
     _i("GVZ", "Gold Volatility", "VOLATILITY", "fred", "GVZCLS", "PRICE", "VOL", "vol pts"),
+    _i("RVX", "Russell 2000 Volatility", "VOLATILITY", "fred", "RVXCLS", "PRICE", "VOL", "vol pts"),
+    # VXOCLS (the old S&P 100 vol index) is deliberately NOT here. It resolves
+    # and returns 9,321 observations, so it looks like a working series -- but
+    # it was discontinued and its last print is 2021-09-23. On a live board a
+    # discontinued series shows a five-year-old number in the same column as
+    # today's, which is worse than not carrying it. Same reason excludes the
+    # monthly copper and quarterly all-commodity indices: both resolve, both
+    # are months stale, and neither belongs beside a daily mark.
 
     # --- govt curve (RATE: risk factors, not share-tradable) --------------
     _i("UST1M", "US 1-Month Bill", "RATE", "fred", "DGS1MO", "RATE", "RATES", "%"),
@@ -95,6 +107,14 @@ UNIVERSE: tuple[Instrument, ...] = (
     _i("UST5Y", "US 5-Year Note", "RATE", "fred", "DGS5", "RATE", "RATES", "%"),
     _i("UST10Y", "US 10-Year Note", "RATE", "fred", "DGS10", "RATE", "RATES", "%"),
     _i("UST30Y", "US 30-Year Bond", "RATE", "fred", "DGS30", "RATE", "RATES", "%"),
+    _i("UST3Y", "US 3-Year Note", "RATE", "fred", "DGS3", "RATE", "RATES", "%"),
+    _i("UST7Y", "US 7-Year Note", "RATE", "fred", "DGS7", "RATE", "RATES", "%"),
+    _i("UST20Y", "US 20-Year Bond", "RATE", "fred", "DGS20", "RATE", "RATES", "%"),
+    # Policy and bank funding, so a curve shock has something to anchor the
+    # front end against rather than inferring it from the 1M bill.
+    _i("FEDTGT", "Fed Funds Target (upper)", "RATE", "fred", "DFEDTARU", "RATE", "RATES", "%"),
+    _i("PRIME", "Bank Prime Loan Rate", "RATE", "fred", "DPRIME", "RATE", "RATES", "%"),
+    _i("FWD5Y5Y", "5y5y Forward Inflation", "RATE", "fred", "T5YIFR", "SPREAD", "RATES", "%"),
     _i("CURVE_10Y2Y", "10Y-2Y Slope", "RATE", "fred", "T10Y2Y", "SPREAD", "RATES", "%"),
     _i("CURVE_10Y3M", "10Y-3M Slope", "RATE", "fred", "T10Y3M", "SPREAD", "RATES", "%"),
     _i("REAL10Y", "10Y TIPS Real Yield", "RATE", "fred", "DFII10", "RATE", "RATES", "%"),
@@ -111,6 +131,18 @@ UNIVERSE: tuple[Instrument, ...] = (
     _i("HY_OAS", "US High Yield OAS", "CREDIT", "fred", "BAMLH0A0HYM2", "SPREAD", "CREDIT", "%"),
     _i("IG_OAS", "US Investment Grade OAS", "CREDIT", "fred", "BAMLC0A0CM", "SPREAD", "CREDIT", "%"),
     _i("CCC_OAS", "US CCC & Lower OAS", "CREDIT", "fred", "BAMLH0A3HYC", "SPREAD", "CREDIT", "%"),
+    # The rating ladder, so a credit shock can widen by quality instead of
+    # moving one aggregate. AAA->AA->BBB->BB->CCC is where compression and
+    # decompression actually show up; with three points it cannot.
+    _i("AA_OAS", "US AA Corporate OAS", "CREDIT", "fred", "BAMLC0A2CAA", "SPREAD", "CREDIT", "%"),
+    _i("BBB_OAS", "US BBB Corporate OAS", "CREDIT", "fred", "BAMLC0A4CBBB", "SPREAD", "CREDIT", "%"),
+    _i("BB_OAS", "US BB High Yield OAS", "CREDIT", "fred", "BAMLH0A1HYBB", "SPREAD", "CREDIT", "%"),
+    _i("EM_OAS", "EM Corporate OAS", "CREDIT", "fred", "BAMLEMCBPIOAS", "SPREAD", "CREDIT", "%"),
+    # A YIELD, not a spread -- hence RATE. Filing an effective yield as a
+    # SPREAD would add a 5.8% "spread" to the credit factor and overstate
+    # every credit shock by roughly the risk-free rate.
+    _i("AAA_YIELD", "US AAA Corporate Yield", "CREDIT", "fred", "BAMLC0A1CAAAEY",
+       "RATE", "CREDIT", "%"),
 
     # --- FX. Each symbol is named for the convention FRED already uses ----
     # USD is the QUOTE currency here: a stronger dollar sends these DOWN.
@@ -125,7 +157,10 @@ UNIVERSE: tuple[Instrument, ...] = (
     _i("USDCAD", "US Dollar / Can Dollar", "FX", "fred", "DEXCAUS", "PRICE", "FX", "CAD per USD", "CAD"),
     _i("USDCHF", "US Dollar / Swiss Franc", "FX", "fred", "DEXSZUS", "PRICE", "FX", "CHF per USD", "CHF"),
     _i("USDCNY", "US Dollar / Renminbi", "FX", "fred", "DEXCHUS", "PRICE", "FX", "CNY per USD", "CNY"),
+    _i("USDMXN", "US Dollar / Mexican Peso", "FX", "fred", "DEXMXUS", "PRICE", "FX", "MXN per USD", "MXN"),
+    _i("USDINR", "US Dollar / Indian Rupee", "FX", "fred", "DEXINUS", "PRICE", "FX", "INR per USD", "INR"),
     _i("DXY_BROAD", "USD Broad Index", "FX", "fred", "DTWEXBGS", "PRICE", "FX", "index"),
+    _i("DXY_AFE", "USD vs Advanced Economies", "FX", "fred", "DTWEXAFEGS", "PRICE", "FX", "index"),
 
     # --- commodities ------------------------------------------------------
     _i("WTI", "WTI Crude", "COMMODITY", "fred", "DCOILWTICO", "PRICE", "COMMODITY", "USD/bbl"),
