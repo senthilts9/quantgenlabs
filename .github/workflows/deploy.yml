@@ -31,14 +31,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Load the deploy key
+      # Not configured is not a failure. Until the secrets are added this
+      # workflow would red-X every single commit, and a check that is always red
+      # is a check nobody reads -- including on the commit where it means
+      # something. It reports "not configured" and succeeds; the deploy step
+      # below is gated on this and simply does not run.
+      - name: Check deploy credentials
+        id: creds
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          if [ -z "$DEPLOY_SSH_KEY" ]; then
-            echo "::error::DEPLOY_SSH_KEY is not set. See scripts/deploy.sh header."
-            exit 1
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "${{ vars.DEPLOY_HOST_KEY }}" ] || [ -z "${{ vars.DEPLOY_HOST }}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Automated deploy is not configured, so this run did nothing. Add DEPLOY_SSH_KEY (secret) and DEPLOY_HOST / DEPLOY_USER / DEPLOY_SITE / DEPLOY_HOST_KEY (variables) -- see docs/deploy-runbook.md. Until then deploy by running ./scripts/deploy.sh locally."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Load the deploy key
+        if: steps.creds.outputs.configured == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
@@ -50,6 +64,7 @@ jobs:
           test -s ~/.ssh/known_hosts || { echo "::error::DEPLOY_HOST_KEY variable not set -- refusing to deploy without a pinned host key"; exit 1; }
 
       - name: Deploy
+        if: steps.creds.outputs.configured == 'true'
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
