@@ -1,0 +1,62 @@
+name: deploy
+
+# Only after CI is green. workflow_run fires when the ci workflow COMPLETES, and
+# the job below still checks its conclusion -- without that check this runs on a
+# failed CI too, which is the whole point of gating on it.
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Show what would change without deploying"
+        type: boolean
+        default: false
+
+# One deploy at a time. Two overlapping rsyncs into the same directory while a
+# build reads from it produces a tree that is neither version.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error::DEPLOY_SSH_KEY is not set. See scripts/deploy.sh header."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # PIN the host key rather than StrictHostKeyChecking=no. Accepting any
+          # key means a deploy would happily push the source and secrets of this
+          # platform to whatever answers on that address.
+          printf '%s\n' "${{ vars.DEPLOY_HOST_KEY }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts || { echo "::error::DEPLOY_HOST_KEY variable not set -- refusing to deploy without a pinned host key"; exit 1; }
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_KEY: /home/runner/.ssh/deploy_key
+          DEPLOY_SITE: ${{ vars.DEPLOY_SITE }}
+        run: ./scripts/deploy.sh ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+
+      - name: Shred the key
+        if: always()
+        run: shred -u ~/.ssh/deploy_key 2>/dev/null || rm -f ~/.ssh/deploy_key
