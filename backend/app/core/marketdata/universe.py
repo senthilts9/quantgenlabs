@@ -202,7 +202,12 @@ ALIASES = {"SP500": "SPX", "SPY": "SPX", "VIXCLS": "VIX", "NDX100": "NDX",
 # Deliberately parsed rather than enumerated: the option chain is combinatorial
 # and listing every strike/expiry in a static tuple is exactly the kind of
 # hardcoding this module exists to remove.
-_OPT_RE = re.compile(r"^([A-Z0-9]+)-([CP])-([0-9]+(?:\.[0-9]+)?)-(\d{8})$")
+# The underlying group allows "_" because desk tickers contain it (DXY_BROAD,
+# DXY_AFE). It is unambiguous: the field delimiter is "-", never "_". Without it
+# those symbols silently fail to parse as options -- resolve() just returns None,
+# so the ticker reads as unknown rather than as "this underlying cannot have
+# options", which is a confusing way to find out.
+_OPT_RE = re.compile(r"^([A-Z0-9_]+)-([CP])-([0-9]+(?:\.[0-9]+)?)-(\d{8})$")
 
 
 def parse_option(symbol: str) -> dict | None:
