@@ -30,7 +30,11 @@ SITE="${DEPLOY_SITE:-https://quantgenlabs.com}"
 DRY=""
 [[ "${1:-}" == "--dry-run" ]] && DRY="--dry-run"
 
-SSH="ssh -i $KEY -o BatchMode=yes -o ConnectTimeout=15"
+# ServerAliveInterval because the build prints nothing for minutes at a time:
+# to a NAT or a load balancer the connection looks idle and gets closed, which
+# is exactly what happened on the 2026-10-02 deploy -- the link dropped mid-build
+# and the health gate never ran.
+SSH="ssh -i $KEY -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 fail() { printf '\033[31mFAILED: %s\033[0m\n' "$*" >&2; exit 1; }
 
@@ -96,9 +100,32 @@ echo "  .env still present"
 
 # ------------------------------------------------------------------- build
 say "Build and restart"
-# Builds first; compose only recreates containers once the build succeeds, so a
-# broken build leaves the current version serving.
-$SSH "$USER_@$HOST" "cd $REMOTE_DIR && docker compose up -d --build 2>&1 | tail -8" | sed 's/^/  /'
+# Detached, then polled. Running it over the live connection means a dropped
+# link kills the build half-done; worse, the script then skips the health gate
+# and exits as though it succeeded. It runs under nohup and writes a sentinel,
+# so the deploy survives the connection and the outcome is read back explicitly.
+#
+# Builds first either way: compose only recreates containers once the build
+# succeeds, so a broken build leaves the current version serving.
+$SSH "$USER_@$HOST" "cd $REMOTE_DIR && rm -f .deploy.done && \
+  nohup sh -c 'docker compose up -d --build > .deploy.log 2>&1; echo \$? > .deploy.done' \
+  >/dev/null 2>&1 &" || true
+
+BUILD_RC=""
+for _ in $(seq 1 180); do            # up to 30 minutes
+  BUILD_RC="$($SSH "$USER_@$HOST" "cat $REMOTE_DIR/.deploy.done 2>/dev/null" 2>/dev/null || true)"
+  [[ -n "$BUILD_RC" ]] && break
+  sleep 10
+done
+$SSH "$USER_@$HOST" "tail -6 $REMOTE_DIR/.deploy.log 2>/dev/null" 2>/dev/null | sed 's/^/  /' || true
+
+if [[ -z "$BUILD_RC" ]]; then
+  fail "build did not finish within 30 minutes -- not touching anything further; check $REMOTE_DIR/.deploy.log"
+fi
+if [[ "$BUILD_RC" != "0" ]]; then
+  echo "  build exited $BUILD_RC -- containers were NOT recreated, the previous version is still serving"
+  fail "build failed (nothing to roll back; see $REMOTE_DIR/.deploy.log)"
+fi
 # Prometheus and Grafana read config from disk at start, so a synced config
 # change does nothing until they restart. This was missed on the first deploy:
 # Prometheus kept taking a 307 on every scrape for a day.
