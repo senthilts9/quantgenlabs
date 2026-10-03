@@ -63,3 +63,12 @@ cpp/.debug/
 
 # Hypothesis property-test database (machine-local falsifying examples)
 .hypothesis/
+
+# Local dev-server logs and screenshot captures. These are produced by running
+# the stack by hand (`uvicorn ... > .uvicorn.log`, `vite > .vite.log`) and by
+# screenshotting a screen to check it renders. They are dot-prefixed so they
+# stay out of the way in a listing, which also means a careless `git add -A`
+# would otherwise sweep a 180 KB PNG into the history.
+/.uvicorn.log
+/.vite.log
+/.*.png

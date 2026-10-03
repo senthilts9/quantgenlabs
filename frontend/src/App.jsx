@@ -3,7 +3,7 @@ import {
   LayoutGrid, Activity, Sigma, TriangleAlert, ShieldCheck, LineChart as LineIcon,
   Layers, Briefcase, Gauge, Coins, History, Database, Bot,
   BookOpen, Search, Command, Circle, ArrowUpRight, ArrowDownRight, Cpu, Zap,
-  CheckCircle2, ChevronRight, Router, Split, Sun, Moon, Library,
+  CheckCircle2, ChevronRight, Router, Split, Sun, Moon, Library, AreaChart,
 } from "lucide-react";
 // Phase 1 digital-assets desk. Aliased because this file already defines a
 // `CryptoDesk` (the previous perps/AMM screen), which the new workspace
@@ -22,6 +22,7 @@ import PerformanceLab from "./screens/PerformanceLab.jsx";
 import ConnectivityScreen from "./screens/Connectivity.jsx";
 import TradingDesk from "./screens/TradingDesk.jsx";
 import ReferenceData from "./screens/ReferenceData.jsx";
+import RiskLab from "./screens/RiskLab.jsx";
 import CommandPalette, { useCommandPalette } from "./components/CommandPalette.jsx";
 
 /* ================================================================== *
@@ -119,6 +120,7 @@ const NAV = [
   { id: "blotter", label: "Holdings & Blotter", icon: Briefcase },
   { group: "RISK", items: [
     { id: "market-risk", label: "Market Risk", icon: Activity },
+    { id: "risklab", label: "Risk & Pricing Lab", icon: AreaChart },
     { id: "sensitivity", label: "Factor & Sensitivity", icon: Sigma },
     { id: "stress", label: "Stress & Scenarios", icon: TriangleAlert },
     { id: "limits", label: "Limits & Alerts", icon: ShieldCheck }] },
@@ -155,7 +157,7 @@ const NAV = [
 // NAV entry without a branch surfaces immediately.
 const HANDLED = new Set(["overview", "sor", "blotter", "limits", "market", "rates",
   "backtest", "sensitivity", "stress", "optim", "genai", "models", "market-risk", "quanthub",
-  "pricing", "obs", "copilot", "connectivity", "perflab", "desk", "refdata",
+  "pricing", "obs", "copilot", "connectivity", "perflab", "desk", "refdata", "risklab",
   ...(CRYPTO_DESK_ENABLED ? ["cryptodesk"] : [])]);
 
 export default function Console() {
@@ -274,6 +276,7 @@ export default function Console() {
           )}
           {view === "desk" && <TradingDesk />}
           {view === "refdata" && <ReferenceData />}
+          {view === "risklab" && <RiskLab />}
           {view === "connectivity" && <ConnectivityScreen />}
           {view === "perflab" && <PerformanceLab />}
           {view === "obs" && <Observability />}
