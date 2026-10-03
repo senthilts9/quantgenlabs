@@ -75,7 +75,15 @@ _store_lock = threading.Lock()
 
 
 def _seed_from_env(store: UserStore) -> None:
-    """QGL_USERS format: user:password:role[,role];user2:password2:role
+    """QGL_USERS format: user:password:role[,role][:Display Name]
+
+        alice:s3cret:trader
+        bob:hunter2:risk,viewer:Bob Chen
+
+    The display name is optional and defaults to the username. It exists so the
+    UI can greet a person rather than an account id -- `store.add` has always
+    accepted it; only this parser dropped it, which made the field unreachable
+    for anyone provisioning through the environment.
 
     Intentionally awkward to use for anything but a small explicit set. If this
     needs a nicer format, it needs a real user table instead.
@@ -87,10 +95,12 @@ def _seed_from_env(store: UserStore) -> None:
         entry = entry.strip()
         if not entry:
             continue
-        parts = entry.split(":")
-        if len(parts) != 3:
+        # Split into at most 4 so a display name may contain a colon.
+        parts = entry.split(":", 3)
+        if len(parts) < 3:
             continue
-        username, password, roles_s = parts
+        username, password, roles_s = parts[0], parts[1], parts[2]
+        display = parts[3].strip() if len(parts) > 3 else ""
         roles = []
         for r in roles_s.split(","):
             try:
@@ -98,7 +108,7 @@ def _seed_from_env(store: UserStore) -> None:
             except ValueError:
                 continue
         if username and password and roles:
-            store.add(username, password, roles)
+            store.add(username, password, roles, display_name=display)
 
 
 def get_user_store() -> UserStore:

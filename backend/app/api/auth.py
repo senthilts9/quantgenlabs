@@ -26,6 +26,9 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_at: str
     username: str
+    # Carried on the login response as well as /me so the UI can render the
+    # header from one call. Defaults to the username when unset.
+    display_name: str
     roles: list[str]
     permissions: list[str]
 
@@ -67,6 +70,7 @@ def token(req: TokenRequest) -> TokenResponse:
                            token_version=user.token_version)
     return TokenResponse(
         access_token=tok, expires_at=exp.isoformat(), username=user.username,
+        display_name=user.display_name or user.username,
         roles=[r.value for r in user.roles],
         permissions=sorted(p.value for p in user.permissions()),
     )

@@ -266,3 +266,61 @@ def test_only_admin_may_revoke(enforced):
     r = client.post("/api/auth/revoke", params={"username": "trader1"},
                     headers=_auth(_tok("admin1")))
     assert r.status_code == 200
+
+
+# ------------------------------------- provisioning display names from the env
+def _seed(raw: str):
+    """Build a store from a QGL_USERS string without touching the global one."""
+    import os
+    from app.core.auth.store import UserStore, _seed_from_env
+    s = UserStore()
+    old = os.environ.get("QGL_USERS")
+    os.environ["QGL_USERS"] = raw
+    try:
+        _seed_from_env(s)
+    finally:
+        if old is None:
+            os.environ.pop("QGL_USERS", None)
+        else:
+            os.environ["QGL_USERS"] = old
+    return s
+
+
+def test_display_name_is_optional_and_defaults_to_the_username():
+    """Three-field entries predate the display name and must keep working --
+    silently dropping those accounts would lock everyone out on upgrade."""
+    s = _seed("alice:s3cret:trader")
+    u = s.get("alice")
+    assert u is not None and u.display_name == "alice"
+    assert s.authenticate("alice", "s3cret") is not None
+
+
+def test_a_fourth_field_sets_the_display_name():
+    s = _seed("bob:hunter2:risk,viewer:Bob Chen")
+    u = s.get("bob")
+    assert u.display_name == "Bob Chen"
+    assert {r.value for r in u.roles} == {"risk", "viewer"}
+
+
+def test_a_display_name_may_contain_a_colon():
+    """Split on at most four parts. Splitting unbounded would truncate any name
+    with a colon in it and, worse, silently discard the rest."""
+    s = _seed("carol:pw:admin:O'Neill: Head of Risk")
+    assert s.get("carol").display_name == "O'Neill: Head of Risk"
+
+
+def test_malformed_entries_are_skipped_not_fatal():
+    """One bad entry must not take out the accounts either side of it, or a
+    typo in an env var locks everybody out at once."""
+    s = _seed("good1:pw:trader;;garbage;also_bad:onlytwo;good2:pw:viewer:Two")
+    assert s.get("good1") is not None
+    assert s.get("good2") is not None and s.get("good2").display_name == "Two"
+    assert s.get("garbage") is None
+    assert s.get("also_bad") is None
+
+
+def test_entry_with_no_valid_role_is_refused():
+    """An account with no role has no permissions. Creating it anyway produces
+    a login that succeeds and then fails on every single action."""
+    s = _seed("ghost:pw:notarole")
+    assert s.get("ghost") is None
